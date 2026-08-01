@@ -70,17 +70,17 @@ export default function AppointmentsPage() {
         <CardHeader>
           <CardTitle>Live Availability Grid</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col divide-y divide-slate-200 dark:divide-slate-800">
+        <CardContent className="flex flex-col divide-y divide-plum-100 dark:divide-white/10">
           {appointments.length ? (
             appointments.map((appt) => (
               <div key={appt.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{appt.clientName}</span>
+                    <span className="font-medium text-plum-700 dark:text-cream-50">{appt.clientName}</span>
                     <CategoryBadge category={appt.category} />
                     <Badge variant={STATUS_VARIANT[appt.status]}>{appt.status}</Badge>
                   </div>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-plum-400 dark:text-cream-100/50">
                     {new Date(appt.bookingTime).toLocaleString()} • {appt.staff?.name || "Unassigned"} •{" "}
                     {appt.services.map((s) => s.service.name).join(", ")}
                   </p>
@@ -107,7 +107,7 @@ export default function AppointmentsPage() {
               </div>
             ))
           ) : (
-            <p className="py-4 text-center text-sm text-slate-400">No bookings for this filter.</p>
+            <p className="py-6 text-center text-sm text-plum-300 dark:text-cream-100/40">No bookings for this filter.</p>
           )}
         </CardContent>
       </Card>

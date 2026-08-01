@@ -60,7 +60,7 @@ export default function ServicesPage() {
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-2 md:grid-cols-5">
           <select
-            className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className="h-10 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"
             value={category}
             onChange={(e) => setCategory(e.target.value as CategoryType)}
           >
@@ -96,17 +96,17 @@ export default function ServicesPage() {
         <CardHeader>
           <CardTitle>Service Menu</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col divide-y divide-slate-200 dark:divide-slate-800">
+        <CardContent className="flex flex-col divide-y divide-plum-100 dark:divide-white/10">
           {data?.services?.length ? (
             data.services.map((s) => (
-              <div key={s.id} className="flex items-center justify-between py-2 text-sm">
+              <div key={s.id} className="flex items-center justify-between py-2.5 text-sm">
                 <div className="flex items-center gap-2">
                   <CategoryBadge category={s.category} />
-                  <span className="font-medium">{s.name}</span>
-                  <span className="text-slate-500">({s.durationMin} min)</span>
+                  <span className="font-medium text-plum-700 dark:text-cream-50">{s.name}</span>
+                  <span className="text-plum-300 dark:text-cream-100/50">({s.durationMin} min)</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span>{formatCurrency(Number(s.price))}</span>
+                  <span className="font-semibold text-brand-600 dark:text-brand-300">{formatCurrency(Number(s.price))}</span>
                   <Button size="sm" variant="ghost" onClick={() => deleteService.mutate(s.id)}>
                     Remove
                   </Button>
@@ -114,7 +114,7 @@ export default function ServicesPage() {
               </div>
             ))
           ) : (
-            <p className="py-4 text-center text-sm text-slate-400">No services yet — add one above.</p>
+            <p className="py-6 text-center text-sm text-plum-300 dark:text-cream-100/40">No services yet — add one above.</p>
           )}
         </CardContent>
       </Card>

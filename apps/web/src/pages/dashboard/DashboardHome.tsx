@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { TrendingUp, ArrowDownCircle, ArrowUpCircle, Wallet, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { LedgerEntry, LedgerType, PaymentMode } from "@/types";
+
+const SELECT_CLASS =
+  "h-10 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50";
 
 export default function DashboardHome() {
   const { toast } = useToast();
@@ -40,12 +44,32 @@ export default function DashboardHome() {
   });
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <SummaryCard label="Net Profit Today" value={formatCurrency(reconciliation?.netProfit ?? 0)} />
-        <SummaryCard label="Income" value={formatCurrency(reconciliation?.totalIncome ?? 0)} />
-        <SummaryCard label="Expenses" value={formatCurrency(reconciliation?.totalExpense ?? 0)} />
-        <SummaryCard label="Cash Drawer" value={formatCurrency(reconciliation?.cashDrawer ?? 0)} />
+        <SummaryCard
+          label="Net Profit Today"
+          value={formatCurrency(reconciliation?.netProfit ?? 0)}
+          icon={TrendingUp}
+          tone="brand"
+        />
+        <SummaryCard
+          label="Income"
+          value={formatCurrency(reconciliation?.totalIncome ?? 0)}
+          icon={ArrowUpCircle}
+          tone="emerald"
+        />
+        <SummaryCard
+          label="Expenses"
+          value={formatCurrency(reconciliation?.totalExpense ?? 0)}
+          icon={ArrowDownCircle}
+          tone="rose"
+        />
+        <SummaryCard
+          label="Cash Drawer"
+          value={formatCurrency(reconciliation?.cashDrawer ?? 0)}
+          icon={Wallet}
+          tone="gold"
+        />
       </div>
 
       <Card>
@@ -53,18 +77,14 @@ export default function DashboardHome() {
           <CardTitle>Add Ledger Entry</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-2 md:grid-cols-5">
-          <select
-            className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-            value={type}
-            onChange={(e) => setType(e.target.value as LedgerType)}
-          >
+          <select className={SELECT_CLASS} value={type} onChange={(e) => setType(e.target.value as LedgerType)}>
             <option value="INCOME">Income</option>
             <option value="EXPENSE">Expense</option>
           </select>
           <Input placeholder="Amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
           <Input placeholder="Category (e.g. utility bill)" value={category} onChange={(e) => setCategory(e.target.value)} />
           <select
-            className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className={SELECT_CLASS}
             value={paymentMode}
             onChange={(e) => setPaymentMode(e.target.value as PaymentMode)}
           >
@@ -77,7 +97,7 @@ export default function DashboardHome() {
             onClick={() => createEntry.mutate()}
             disabled={!amount || !category || createEntry.isPending}
           >
-            Add
+            <Plus className="h-4 w-4" /> Add
           </Button>
         </CardContent>
       </Card>
@@ -86,24 +106,24 @@ export default function DashboardHome() {
         <CardHeader>
           <CardTitle>Recent Ledger Entries</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col divide-y divide-slate-200 dark:divide-slate-800">
+        <CardContent className="flex flex-col divide-y divide-plum-100 dark:divide-white/10">
           {entriesData?.entries?.length ? (
             entriesData.entries.slice(0, 15).map((entry) => (
-              <div key={entry.id} className="flex items-center justify-between py-2 text-sm">
+              <div key={entry.id} className="flex items-center justify-between py-2.5 text-sm">
                 <div>
-                  <p className="font-medium">{entry.category}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="font-medium text-plum-700 dark:text-cream-50">{entry.category}</p>
+                  <p className="text-xs text-plum-300 dark:text-cream-100/50">
                     {entry.paymentMode} • {new Date(entry.createdAt).toLocaleString()}
                   </p>
                 </div>
-                <span className={entry.type === "INCOME" ? "text-emerald-600" : "text-red-600"}>
+                <span className={cn("font-semibold", entry.type === "INCOME" ? "text-emerald-600" : "text-rose-600")}>
                   {entry.type === "INCOME" ? "+" : "-"}
                   {formatCurrency(Number(entry.amount))}
                 </span>
               </div>
             ))
           ) : (
-            <p className="py-4 text-center text-sm text-slate-400">No ledger entries yet</p>
+            <p className="py-6 text-center text-sm text-plum-300 dark:text-cream-100/40">No ledger entries yet</p>
           )}
         </CardContent>
       </Card>
@@ -111,12 +131,34 @@ export default function DashboardHome() {
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+const TONE_CLASSES: Record<string, string> = {
+  brand: "bg-gradient-brand text-white",
+  emerald: "bg-gradient-to-br from-emerald-400 to-emerald-600 text-white",
+  rose: "bg-gradient-to-br from-rose-400 to-rose-600 text-white",
+  gold: "bg-gradient-gold text-white",
+};
+
+function SummaryCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  icon: typeof TrendingUp;
+  tone: keyof typeof TONE_CLASSES;
+}) {
   return (
     <Card>
-      <CardContent className="p-4">
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className="text-lg font-semibold">{value}</p>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm", TONE_CLASSES[tone])}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-xs text-plum-400 dark:text-cream-100/50">{label}</p>
+          <p className="truncate font-display text-lg font-semibold text-plum-800 dark:text-cream-50">{value}</p>
+        </div>
       </CardContent>
     </Card>
   );

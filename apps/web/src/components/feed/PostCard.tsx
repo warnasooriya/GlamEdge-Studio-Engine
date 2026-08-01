@@ -25,21 +25,27 @@ export function PostCard({ post }: { post: FeedPost }) {
   }
 
   return (
-    <div className="glass-panel overflow-hidden">
-      {post.mediaType === "video" ? (
-        <video src={post.mediaUrl} className="aspect-square w-full object-cover" controls />
-      ) : (
-        <img src={post.mediaUrl} className="aspect-square w-full object-cover" alt={post.caption || "salon work"} />
-      )}
+    <div className="glass-panel group overflow-hidden">
+      <div className="overflow-hidden">
+        {post.mediaType === "video" ? (
+          <video src={post.mediaUrl} className="aspect-square w-full object-cover" controls />
+        ) : (
+          <img
+            src={post.mediaUrl}
+            className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            alt={post.caption || "salon work"}
+          />
+        )}
+      </div>
       <div className="flex flex-col gap-1 p-3">
         <div className="flex items-center justify-between">
           <CategoryBadge category={post.category} />
-          {post.staffName && <span className="text-xs text-slate-500">{post.staffName}</span>}
+          {post.staffName && <span className="text-xs text-plum-400 dark:text-cream-100/50">{post.staffName}</span>}
         </div>
-        {post.caption && <p className="text-sm">{post.caption}</p>}
-        <div className="flex items-center gap-4 pt-1 text-sm text-slate-500">
-          <button onClick={toggleLike} className={cn("flex items-center gap-1", liked && "text-brand-pink")}>
-            <Heart className={cn("h-4 w-4", liked && "fill-brand-pink")} /> {likeCount}
+        {post.caption && <p className="text-sm text-plum-700 dark:text-cream-50">{post.caption}</p>}
+        <div className="flex items-center gap-4 pt-1 text-sm text-plum-400 dark:text-cream-100/50">
+          <button onClick={toggleLike} className={cn("flex items-center gap-1 transition-colors", liked && "text-brand-500")}>
+            <Heart className={cn("h-4 w-4", liked && "fill-brand-500")} /> {likeCount}
           </button>
           <button onClick={() => setShowComments((v) => !v)} className="flex items-center gap-1">
             <MessageCircle className="h-4 w-4" /> {post.commentCount}
@@ -70,31 +76,31 @@ function CommentsSection({ postId }: { postId: string }) {
 
   if (comments === null) {
     load();
-    return <p className="text-xs text-slate-400">Loading comments...</p>;
+    return <p className="text-xs text-plum-300 dark:text-cream-100/40">Loading comments...</p>;
   }
 
   return (
-    <div className="flex flex-col gap-2 border-t border-slate-200 pt-2 dark:border-slate-800">
+    <div className="flex flex-col gap-2 border-t border-plum-100 pt-2 dark:border-white/10">
       {comments.map((c) => (
-        <p key={c._id} className="text-xs">
-          <span className="font-medium">{c.authorName}:</span> {c.text}
+        <p key={c._id} className="text-xs text-plum-600 dark:text-cream-100/80">
+          <span className="font-semibold text-plum-800 dark:text-cream-50">{c.authorName}:</span> {c.text}
         </p>
       ))}
       <div className="flex gap-1">
         <input
-          className="h-8 flex-1 rounded-md border border-slate-300 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+          className="h-8 flex-1 rounded-lg border border-plum-100 bg-white/90 px-2 text-xs dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"
           placeholder="Your name"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
         <input
-          className="h-8 flex-[2] rounded-md border border-slate-300 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+          className="h-8 flex-[2] rounded-lg border border-plum-100 bg-white/90 px-2 text-xs dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"
           placeholder="Add a comment..."
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
         />
-        <button onClick={submit} className="rounded-md bg-brand-navy px-2 text-xs text-white">
+        <button onClick={submit} className="rounded-lg bg-gradient-brand px-2.5 text-xs font-semibold text-white">
           Post
         </button>
       </div>

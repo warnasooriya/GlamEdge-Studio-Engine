@@ -36,15 +36,18 @@ export function ReviewsSection({ slug }: { slug: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="glass-panel p-4">
-        <p className="text-sm font-semibold">
-          {data ? `${data.avgRating.toFixed(1)} ★ (${data.count} verified reviews)` : "Loading..."}
+      <div className="glass-panel flex items-center gap-3 p-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-gold text-white shadow-sm">
+          <Star className="h-5 w-5 fill-current" />
+        </div>
+        <p className="font-display text-lg font-semibold text-plum-800 dark:text-cream-50">
+          {data ? `${data.avgRating.toFixed(1)} · ${data.count} verified review${data.count === 1 ? "" : "s"}` : "Loading..."}
         </p>
       </div>
 
-      <div className="glass-panel flex flex-col gap-2 p-4">
-        <p className="text-sm font-medium">Leave a verified review</p>
-        <p className="text-xs text-slate-500">
+      <div className="glass-panel flex flex-col gap-2 p-5">
+        <p className="section-heading text-base">Leave a verified review</p>
+        <p className="text-xs text-plum-400 dark:text-cream-100/50">
           Only clients with a completed & billed appointment can review. Use the booking reference from
           your confirmation or invoice.
         </p>
@@ -56,7 +59,7 @@ export function ReviewsSection({ slug }: { slug: string }) {
         <div className="flex gap-1">
           {[1, 2, 3, 4, 5].map((n) => (
             <button key={n} onClick={() => setRating(n)}>
-              <Star className={`h-5 w-5 ${n <= rating ? "fill-brand-gold text-brand-gold" : "text-slate-300"}`} />
+              <Star className={`h-6 w-6 transition-colors ${n <= rating ? "fill-amber-400 text-amber-400" : "text-plum-100 dark:text-white/15"}`} />
             </button>
           ))}
         </div>
@@ -72,12 +75,12 @@ export function ReviewsSection({ slug }: { slug: string }) {
 
       <div className="flex flex-col gap-2">
         {data?.reviews.map((r) => (
-          <div key={r.id} className="glass-panel p-3 text-sm">
+          <div key={r.id} className="glass-panel p-4 text-sm">
             <div className="flex items-center justify-between">
-              <span className="font-medium">{r.clientName}</span>
-              <span className="text-brand-gold">{"★".repeat(r.rating)}</span>
+              <span className="font-medium text-plum-700 dark:text-cream-50">{r.clientName}</span>
+              <span className="text-amber-400">{"★".repeat(r.rating)}</span>
             </div>
-            {r.comment && <p className="mt-1 text-slate-600 dark:text-slate-300">{r.comment}</p>}
+            {r.comment && <p className="mt-1 text-plum-500 dark:text-cream-100/70">{r.comment}</p>}
           </div>
         ))}
       </div>

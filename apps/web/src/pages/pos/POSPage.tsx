@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Receipt } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,51 +38,55 @@ export default function POSPage() {
   });
 
   return (
-    <div className="p-2">
-      <Card>
-        <CardHeader>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-gold text-white shadow-sm">
+            <Receipt className="h-4.5 w-4.5" />
+          </div>
           <CardTitle>One-Tap Billing</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col divide-y divide-slate-200 dark:divide-slate-800">
-          {billable.length ? (
-            billable.map((appt) => {
-              const total = appt.services.reduce((sum, s) => sum + Number(s.price), 0);
-              return (
-                <div key={appt.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{appt.clientName}</span>
-                      <CategoryBadge category={appt.category} />
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      {appt.services.map((s) => s.service.name).join(", ")} • {formatCurrency(total)}
-                    </p>
-                  </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col divide-y divide-plum-100 dark:divide-white/10">
+        {billable.length ? (
+          billable.map((appt) => {
+            const total = appt.services.reduce((sum, s) => sum + Number(s.price), 0);
+            return (
+              <div key={appt.id} className="flex flex-wrap items-center justify-between gap-2 py-3.5 text-sm">
+                <div>
                   <div className="flex items-center gap-2">
-                    <select
-                      className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-                      value={paymentModeByAppt[appt.id] || "CASH"}
-                      onChange={(e) =>
-                        setPaymentModeByAppt((prev) => ({ ...prev, [appt.id]: e.target.value as PaymentMode }))
-                      }
-                    >
-                      <option value="CASH">Cash</option>
-                      <option value="CARD">Card</option>
-                      <option value="ONLINE">Online</option>
-                      <option value="LANKAQR">LankaQR</option>
-                    </select>
-                    <Button size="sm" onClick={() => createInvoice.mutate(appt.id)} disabled={createInvoice.isPending}>
-                      Bill & Send
-                    </Button>
+                    <span className="font-medium text-plum-700 dark:text-cream-50">{appt.clientName}</span>
+                    <CategoryBadge category={appt.category} />
                   </div>
+                  <p className="text-xs text-plum-400 dark:text-cream-100/50">
+                    {appt.services.map((s) => s.service.name).join(", ")} •{" "}
+                    <span className="font-semibold text-brand-600 dark:text-brand-300">{formatCurrency(total)}</span>
+                  </p>
                 </div>
-              );
-            })
-          ) : (
-            <p className="py-4 text-center text-sm text-slate-400">Nothing to bill right now.</p>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    className="h-9 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"
+                    value={paymentModeByAppt[appt.id] || "CASH"}
+                    onChange={(e) =>
+                      setPaymentModeByAppt((prev) => ({ ...prev, [appt.id]: e.target.value as PaymentMode }))
+                    }
+                  >
+                    <option value="CASH">Cash</option>
+                    <option value="CARD">Card</option>
+                    <option value="ONLINE">Online</option>
+                    <option value="LANKAQR">LankaQR</option>
+                  </select>
+                  <Button size="sm" variant="gold" onClick={() => createInvoice.mutate(appt.id)} disabled={createInvoice.isPending}>
+                    Bill & Send
+                  </Button>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <p className="py-8 text-center text-sm text-plum-300 dark:text-cream-100/40">Nothing to bill right now.</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

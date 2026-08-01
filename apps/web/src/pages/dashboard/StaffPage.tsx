@@ -5,7 +5,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 import { Staff } from "@/types";
+
+const AVATAR_TONES = [
+  "bg-gradient-to-br from-brand-400 to-brand-600",
+  "bg-gradient-to-br from-amber-400 to-amber-600",
+  "bg-gradient-to-br from-plum-400 to-plum-600",
+  "bg-gradient-to-br from-emerald-400 to-emerald-600",
+];
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 export default function StaffPage() {
   const { toast } = useToast();
@@ -60,15 +77,25 @@ export default function StaffPage() {
         <CardHeader>
           <CardTitle>Team</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col divide-y divide-slate-200 dark:divide-slate-800">
+        <CardContent className="flex flex-col divide-y divide-plum-100 dark:divide-white/10">
           {data?.staff?.length ? (
-            data.staff.map((s) => (
-              <div key={s.id} className="flex items-center justify-between py-2 text-sm">
-                <div>
-                  <p className="font-medium">{s.name}</p>
-                  <p className="text-xs text-slate-500">
-                    {s.role} • {s.commission}% commission
-                  </p>
+            data.staff.map((s, i) => (
+              <div key={s.id} className="flex items-center justify-between py-2.5 text-sm">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={cn(
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm",
+                      AVATAR_TONES[i % AVATAR_TONES.length]
+                    )}
+                  >
+                    {initials(s.name)}
+                  </div>
+                  <div>
+                    <p className="font-medium text-plum-700 dark:text-cream-50">{s.name}</p>
+                    <p className="text-xs text-plum-400 dark:text-cream-100/50">
+                      {s.role} • {s.commission}% commission
+                    </p>
+                  </div>
                 </div>
                 <Button size="sm" variant="ghost" onClick={() => deleteStaff.mutate(s.id)}>
                   Remove
@@ -76,7 +103,7 @@ export default function StaffPage() {
               </div>
             ))
           ) : (
-            <p className="py-4 text-center text-sm text-slate-400">No staff yet — add one above.</p>
+            <p className="py-6 text-center text-sm text-plum-300 dark:text-cream-100/40">No staff yet — add one above.</p>
           )}
         </CardContent>
       </Card>

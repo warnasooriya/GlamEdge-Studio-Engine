@@ -8,12 +8,41 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+    @apply bg-cream-50 text-plum-900 antialiased dark:bg-plum-800 dark:text-cream-100;
+    font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    background-image: radial-gradient(circle at 100% 0%, rgba(255, 148, 186, 0.16), transparent 45%),
+      radial-gradient(circle at 0% 100%, rgba(217, 119, 6, 0.1), transparent 40%);
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: "Fraunces", serif;
   }
 }
 
 @layer components {
   .glass-panel {
-    @apply bg-glass-surface dark:bg-glass-darkSurface backdrop-blur-glass border border-glass-border rounded-lg shadow-sm;
+    @apply rounded-xl border border-glass-border bg-glass-surface shadow-panel backdrop-blur-glass dark:border-glass-darkBorder dark:bg-glass-darkSurface;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-brand bg-clip-text text-transparent;
+  }
+
+  .section-heading {
+    @apply font-display text-2xl font-semibold tracking-tight text-plum-800 dark:text-cream-50;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-brand-300;
   }
 }

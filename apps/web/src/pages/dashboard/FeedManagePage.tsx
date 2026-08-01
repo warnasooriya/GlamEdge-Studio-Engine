@@ -56,10 +56,15 @@ export default function FeedManagePage() {
           <CardTitle>Upload to Showcase Feed</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
-          <input ref={fileRef} type="file" accept="image/*,video/mp4" />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,video/mp4"
+            className="rounded-lg border border-dashed border-brand-300 bg-brand-50 px-3 py-3 text-sm text-plum-500 file:mr-3 file:rounded-full file:border-0 file:bg-gradient-brand file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white dark:border-white/15 dark:bg-white/5 dark:text-cream-100/70"
+          />
           <div className="flex gap-2">
             <select
-              className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="h-10 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"
               value={category}
               onChange={(e) => setCategory(e.target.value as CategoryType)}
             >
@@ -80,22 +85,28 @@ export default function FeedManagePage() {
           <CardTitle>Your Posts</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {data?.posts.map((post) => (
-            <div key={post._id} className="flex flex-col gap-1">
-              {post.mediaType === "video" ? (
-                <video src={post.mediaUrl} className="aspect-square w-full rounded-md object-cover" />
-              ) : (
-                <img src={post.mediaUrl} className="aspect-square w-full rounded-md object-cover" alt="" />
-              )}
-              <CategoryBadge category={post.category} />
-              <p className="text-xs text-slate-500">
-                {post.likeCount} likes • {post.commentCount} comments
-              </p>
-              <Button size="sm" variant="ghost" onClick={() => deletePost.mutate(post._id)}>
-                Delete
-              </Button>
-            </div>
-          ))}
+          {data?.posts.length ? (
+            data.posts.map((post) => (
+              <div key={post._id} className="flex flex-col gap-1.5 rounded-xl border border-plum-100 p-2 dark:border-white/10">
+                {post.mediaType === "video" ? (
+                  <video src={post.mediaUrl} className="aspect-square w-full rounded-lg object-cover" />
+                ) : (
+                  <img src={post.mediaUrl} className="aspect-square w-full rounded-lg object-cover" alt="" />
+                )}
+                <CategoryBadge category={post.category} />
+                <p className="text-xs text-plum-400 dark:text-cream-100/50">
+                  {post.likeCount} likes • {post.commentCount} comments
+                </p>
+                <Button size="sm" variant="ghost" onClick={() => deletePost.mutate(post._id)}>
+                  Delete
+                </Button>
+              </div>
+            ))
+          ) : (
+            <p className="col-span-full py-6 text-center text-sm text-plum-300 dark:text-cream-100/40">
+              No posts yet — upload one above.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
