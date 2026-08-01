@@ -1,8 +1,10 @@
 import { Response, Request } from "express";
 import { prisma } from "@/config/prisma";
 import { AuthRequest } from "@/middlewares/requireAuth";
+import { ClientAuthRequest } from "@/middlewares/requireClientAuth";
 import { HttpError } from "@/middlewares/errorHandler";
 import { emitToTenant } from "@/realtime/socket";
+import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { createAppointmentSchema, updateStatusSchema } from "./appointment.schema";
 
 const APPOINTMENT_INCLUDE = {
@@ -11,34 +13,63 @@ const APPOINTMENT_INCLUDE = {
 } as const;
 
 export async function listAppointments(req: AuthRequest, res: Response) {
-  const { from, to, status } = req.query as { from?: string; to?: string; status?: string };
+  const { from, to, status, search, isBilled, excludeCancelled } = req.query as {
+    from?: string;
+    to?: string;
+    status?: string;
+    search?: string;
+    isBilled?: string;
+    excludeCancelled?: string;
+  };
+  const { page, pageSize, skip, take } = parsePagination(req.query, 20, 100);
 
-  const appointments = await prisma.appointment.findMany({
-    where: {
-      tenantId: req.tenantId!,
-      ...(status ? { status: status as any } : {}),
-      ...(from || to
-        ? {
-            bookingTime: {
-              ...(from ? { gte: new Date(from) } : {}),
-              ...(to ? { lte: new Date(to) } : {}),
-            },
-          }
+  const where = {
+    tenantId: req.tenantId!,
+    ...(status
+      ? { status: status as any }
+      : excludeCancelled === "true"
+        ? { status: { not: "CANCELLED" as any } }
         : {}),
-    },
-    include: APPOINTMENT_INCLUDE,
-    orderBy: { bookingTime: "asc" },
-  });
+    ...(isBilled !== undefined ? { isBilled: isBilled === "true" } : {}),
+    ...(from || to
+      ? {
+          bookingTime: {
+            ...(from ? { gte: new Date(from) } : {}),
+            ...(to ? { lte: new Date(to) } : {}),
+          },
+        }
+      : {}),
+    ...(search
+      ? {
+          OR: [
+            { clientName: { contains: search } },
+            { clientPhone: { contains: search } },
+          ],
+        }
+      : {}),
+  };
 
-  return res.json({ success: true, appointments });
+  const [appointments, total] = await Promise.all([
+    prisma.appointment.findMany({
+      where,
+      include: APPOINTMENT_INCLUDE,
+      orderBy: { bookingTime: "asc" },
+      skip,
+      take,
+    }),
+    prisma.appointment.count({ where }),
+  ]);
+
+  return res.json({ success: true, appointments, ...paginationMeta(total, page, pageSize) });
 }
 
-export async function createPublicAppointment(req: Request, res: Response) {
+export async function createPublicAppointment(req: ClientAuthRequest, res: Response) {
   const { slug } = req.params;
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
   if (!tenant || !tenant.isActive) throw new HttpError(404, "Salon not found");
 
   const data = createAppointmentSchema.parse(req.body);
+  const { clientId, phone: clientPhone } = req.clientAuth!;
 
   const services = await prisma.service.findMany({
     where: { id: { in: data.serviceIds }, tenantId: tenant.id, isActive: true },
@@ -51,8 +82,9 @@ export async function createPublicAppointment(req: Request, res: Response) {
     data: {
       tenantId: tenant.id,
       staffId: data.staffId,
+      clientId,
       clientName: data.clientName,
-      clientPhone: data.clientPhone,
+      clientPhone,
       category: data.category,
       bookingTime: data.bookingTime,
       notes: data.notes,

@@ -48,6 +48,12 @@ model Tenant {
   ownerName    String           @db.VarChar(191)
   subscription SubscriptionTier @default(STARTER)
   isActive     Boolean          @default(true)
+  logoUrl      String?          @db.VarChar(500)
+  address      String?          @db.Text
+  mapLink      String?          @db.VarChar(500)
+  latitude     Float?
+  longitude    Float?
+  contactPhone String?          @db.VarChar(50)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -100,6 +106,8 @@ model Appointment {
   tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   staffId     String?
   staff       Staff?            @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  clientId    String?
+  client      Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
   clientName  String            @db.VarChar(191)
   clientPhone String            @db.VarChar(50)
   category    CategoryType
@@ -116,7 +124,20 @@ model Appointment {
 
   @@index([tenantId])
   @@index([bookingTime])
+  @@index([clientId])
   @@map("appointments")
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  phone     String   @unique @db.VarChar(50)
+  name      String   @db.VarChar(191)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appointments Appointment[]
+
+  @@map("clients")
 }
 
 model AppointmentService {

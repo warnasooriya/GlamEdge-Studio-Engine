@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { CheckCircle2, Clock } from "lucide-react";
-import { api } from "@/lib/api";
+import { clientApi } from "@/lib/clientApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { useToast } from "@/components/ui/toast";
+import { useAppDispatch, useAppSelector } from "@/hooks/redux";
+import { clientLogout } from "@/store/clientAuthSlice";
 import { formatCurrency, cn } from "@/lib/utils";
+import { generateTimeSlots, toLocalDateStr } from "@/lib/timeSlots";
 import { CategoryType, Service, Staff } from "@/types";
 
 interface Props {
@@ -16,18 +19,26 @@ interface Props {
 }
 
 const SELECT_CLASS =
-  "h-10 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50";
+  "h-10 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50 disabled:opacity-50";
 
 export function BookingForm({ slug, services, staff }: Props) {
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
+  const client = useAppSelector((s) => s.clientAuth.client)!;
   const [category, setCategory] = useState<CategoryType>("LADIES");
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [staffId, setStaffId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [clientName, setClientName] = useState("");
-  const [clientPhone, setClientPhone] = useState("");
+  const [clientName, setClientName] = useState(client.name);
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
+
+  const today = toLocalDateStr(new Date());
+  const timeSlots = useMemo(() => generateTimeSlots(date), [date]);
+
+  useEffect(() => {
+    if (time && !timeSlots.includes(time)) setTime("");
+  }, [timeSlots, time]);
 
   const categoryServices = services.filter((s) => s.category === category);
   const selectedTotal = services
@@ -36,9 +47,8 @@ export function BookingForm({ slug, services, staff }: Props) {
 
   const book = useMutation({
     mutationFn: async () =>
-      api.post(`/api/appointments/public/${slug}`, {
+      clientApi.post(`/api/appointments/public/${slug}`, {
         clientName,
-        clientPhone,
         category,
         staffId: staffId || undefined,
         bookingTime: new Date(`${date}T${time}`).toISOString(),
@@ -74,6 +84,15 @@ export function BookingForm({ slug, services, staff }: Props) {
 
   return (
     <div className="glass-panel flex flex-col gap-4 p-5">
+      <div className="flex items-center justify-between text-xs text-plum-400 dark:text-cream-100/50">
+        <span>
+          Booking as <span className="font-semibold text-plum-600 dark:text-cream-100/80">{client.phone}</span>
+        </span>
+        <button onClick={() => dispatch(clientLogout())} className="font-medium text-brand-500 hover:underline">
+          Not you? Log out
+        </button>
+      </div>
+
       <div className="flex gap-2">
         {(["LADIES", "GENTS", "KIDS"] as const).map((c) => (
           <button
@@ -131,18 +150,27 @@ export function BookingForm({ slug, services, staff }: Props) {
       )}
 
       <div className="grid grid-cols-2 gap-2">
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        <Input type="date" min={today} value={date} onChange={(e) => setDate(e.target.value)} />
+        <select
+          className={SELECT_CLASS}
+          value={time}
+          disabled={!date}
+          onChange={(e) => setTime(e.target.value)}
+        >
+          <option value="">{date ? "Select a time" : "Pick a date first"}</option>
+          {timeSlots.map((slot) => (
+            <option key={slot} value={slot}>
+              {slot}
+            </option>
+          ))}
+        </select>
       </div>
 
       <Input placeholder="Your name" value={clientName} onChange={(e) => setClientName(e.target.value)} />
-      <Input placeholder="Your phone (07XXXXXXXX)" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} />
 
       <Button
         size="lg"
-        disabled={
-          !clientName || !clientPhone || !date || !time || selectedServiceIds.length === 0 || book.isPending
-        }
+        disabled={!clientName || !date || !time || selectedServiceIds.length === 0 || book.isPending}
         onClick={() => book.mutate()}
       >
         <Clock className="h-4 w-4" /> Book Appointment

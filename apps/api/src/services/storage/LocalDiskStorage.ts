@@ -10,6 +10,10 @@ export class LocalDiskStorage implements StorageProvider {
     const filePath = path.join(UPLOADS_DIR, key);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, buffer);
+    return this.getUrl(key);
+  }
+
+  getUrl(key: string): string {
     return `http://localhost:${env.port}/uploads/${key}`;
   }
 }

@@ -11,6 +11,18 @@ export interface Tenant {
   ownerName: string;
   subscription: "STARTER" | "PRO" | "ENTERPRISE";
   isActive: boolean;
+  logoUrl?: string | null;
+  address?: string | null;
+  mapLink?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  contactPhone?: string | null;
+}
+
+export interface Client {
+  id: string;
+  phone: string;
+  name: string;
 }
 
 export interface Service {
@@ -60,13 +72,19 @@ export interface LedgerEntry {
   createdAt: string;
 }
 
+export interface FeedMediaItem {
+  url: string;
+  type: "image" | "video";
+  width?: number;
+  height?: number;
+}
+
 export interface FeedPost {
   _id: string;
   tenantId: string;
   staffName?: string;
   category: CategoryType;
-  mediaUrl: string;
-  mediaType: "image" | "video";
+  media: FeedMediaItem[];
   caption?: string;
   tags: string[];
   likeCount: number;
@@ -81,4 +99,35 @@ export interface Review {
   comment?: string | null;
   isVerified: boolean;
   createdAt: string;
+}
+
+export interface CustomerSummary {
+  id: string;
+  name: string;
+  phone: string;
+  createdAt: string;
+  visitCount: number;
+  completedCount: number;
+  lastVisit: string;
+  avgRating: number | null;
+  reviewCount: number;
+}
+
+export interface CustomerDetail {
+  client: { id: string; name: string; phone: string; createdAt: string };
+  appointments: Appointment[];
+  reviews: Review[];
+}
+
+export interface Invoice {
+  id: string;
+  appointmentId: string;
+  clientName: string;
+  clientPhone: string;
+  services: string[];
+  amount: string;
+  paymentMode: PaymentMode;
+  createdAt: string;
+  invoiceUrl: string;
+  receiptImageUrl: string;
 }

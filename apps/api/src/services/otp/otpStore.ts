@@ -33,9 +33,13 @@ export async function issueOtp(phone: string): Promise<string> {
 
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
   const stored = await redis.get(otpKey(phone));
-  if (!stored || stored !== code) {
-    return false;
-  }
+  return Boolean(stored && stored === code);
+}
+
+// Call only once the caller is certain the OTP-verified flow will complete
+// (e.g. after any "extra fields required for first-time registration" checks
+// have passed) — deleting eagerly inside verifyOtp() would burn the code on
+// a check that then fails validation, breaking the user's very next retry.
+export async function consumeOtp(phone: string): Promise<void> {
   await redis.del(otpKey(phone));
-  return true;
 }

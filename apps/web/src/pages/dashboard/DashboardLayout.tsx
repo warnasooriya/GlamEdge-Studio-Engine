@@ -10,6 +10,8 @@ import {
   ExternalLink,
   Image,
   Sparkles,
+  UserCircle,
+  Settings,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
 import { logout } from "@/store/authSlice";
@@ -19,10 +21,12 @@ import { cn } from "@/lib/utils";
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/dashboard/appointments", label: "Bookings", icon: CalendarClock },
+  { to: "/dashboard/customers", label: "Customers", icon: UserCircle },
   { to: "/dashboard/services", label: "Services", icon: Scissors },
   { to: "/dashboard/staff", label: "Staff", icon: Users },
   { to: "/dashboard/feed", label: "Showcase Feed", icon: Image },
   { to: "/pos", label: "POS Billing", icon: Receipt },
+  { to: "/dashboard/settings", label: "Profile", icon: Settings },
 ];
 
 export default function DashboardLayout() {

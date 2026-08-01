@@ -1,13 +1,22 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { TrendingUp, ArrowDownCircle, ArrowUpCircle, Wallet, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/shared/Pagination";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCurrency } from "@/lib/utils";
 import { LedgerEntry, LedgerType, PaymentMode } from "@/types";
+
+interface LedgerEntriesResponse {
+  entries: LedgerEntry[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
 
 const SELECT_CLASS =
   "h-10 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50";
@@ -21,9 +30,13 @@ export default function DashboardHome() {
     queryFn: async () => (await api.get("/api/ledger/reconciliation")).data,
   });
 
+  const [entriesPage, setEntriesPage] = useState(1);
+
   const { data: entriesData } = useQuery({
-    queryKey: ["ledger", "entries"],
-    queryFn: async () => (await api.get<{ entries: LedgerEntry[] }>("/api/ledger")).data,
+    queryKey: ["ledger", "entries", entriesPage],
+    queryFn: async () =>
+      (await api.get<LedgerEntriesResponse>("/api/ledger", { params: { page: entriesPage } })).data,
+    placeholderData: keepPreviousData,
   });
 
   const [type, setType] = useState<LedgerType>("EXPENSE");
@@ -38,6 +51,7 @@ export default function DashboardHome() {
       toast("Ledger entry added", "success");
       setAmount("");
       setCategory("");
+      setEntriesPage(1);
       queryClient.invalidateQueries({ queryKey: ["ledger"] });
     },
     onError: (err: any) => toast(err.response?.data?.error || "Failed to add entry", "error"),
@@ -108,7 +122,7 @@ export default function DashboardHome() {
         </CardHeader>
         <CardContent className="flex flex-col divide-y divide-plum-100 dark:divide-white/10">
           {entriesData?.entries?.length ? (
-            entriesData.entries.slice(0, 15).map((entry) => (
+            entriesData.entries.map((entry) => (
               <div key={entry.id} className="flex items-center justify-between py-2.5 text-sm">
                 <div>
                   <p className="font-medium text-plum-700 dark:text-cream-50">{entry.category}</p>
@@ -124,6 +138,11 @@ export default function DashboardHome() {
             ))
           ) : (
             <p className="py-6 text-center text-sm text-plum-300 dark:text-cream-100/40">No ledger entries yet</p>
+          )}
+          {entriesData && (
+            <div className="pt-1">
+              <Pagination page={entriesData.page} totalPages={entriesData.totalPages} onPageChange={setEntriesPage} />
+            </div>
           )}
         </CardContent>
       </Card>

@@ -2,7 +2,7 @@ import { Response } from "express";
 import { prisma } from "@/config/prisma";
 import { HttpError } from "@/middlewares/errorHandler";
 import { otpProvider } from "@/services/otp";
-import { issueOtp, verifyOtp } from "@/services/otp/otpStore";
+import { issueOtp, verifyOtp, consumeOtp } from "@/services/otp/otpStore";
 import { generateUniqueSlug } from "@/utils/slug";
 import { signToken } from "@/utils/jwt";
 import { requestOtpSchema, verifyOtpSchema } from "./auth.schema";
@@ -35,6 +35,8 @@ export async function verifyOtpAndAuth(req: Request, res: Response) {
       data: { phone, salonName, ownerName, slug },
     });
   }
+
+  await consumeOtp(phone);
 
   const token = signToken({ tenantId: tenant.id, phone: tenant.phone });
   return res.status(200).json({ success: true, token, tenant });

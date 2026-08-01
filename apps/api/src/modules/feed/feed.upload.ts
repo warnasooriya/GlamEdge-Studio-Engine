@@ -1,10 +1,11 @@
 import multer from "multer";
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15MB
+const MAX_FILES = 10;
 
 export const uploadMedia = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_FILE_SIZE_BYTES },
+  limits: { fileSize: MAX_FILE_SIZE_BYTES, files: MAX_FILES },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/jpeg", "image/png", "image/webp", "video/mp4"];
     if (!allowed.includes(file.mimetype)) {

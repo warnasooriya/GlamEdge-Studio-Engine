@@ -5,10 +5,11 @@ export const statusEnum = z.enum(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLE
 
 export const createAppointmentSchema = z.object({
   clientName: z.string().min(1).max(191),
-  clientPhone: z.string().min(9).max(50),
   category: categoryEnum,
   staffId: z.string().uuid().optional(),
-  bookingTime: z.coerce.date(),
+  bookingTime: z.coerce.date().refine((d) => d.getTime() > Date.now(), {
+    message: "bookingTime must be in the future",
+  }),
   notes: z.string().max(2000).optional(),
   serviceIds: z.array(z.string().uuid()).min(1),
 });

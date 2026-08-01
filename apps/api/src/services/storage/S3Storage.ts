@@ -25,6 +25,10 @@ export class S3Storage implements StorageProvider {
       })
     );
 
+    return this.getUrl(key);
+  }
+
+  getUrl(key: string): string {
     if (env.aws.cloudfrontUrl) {
       return `${env.aws.cloudfrontUrl.replace(/\/$/, "")}/${key}`;
     }

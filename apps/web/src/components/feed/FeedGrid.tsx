@@ -33,9 +33,11 @@ export function FeedGrid({ tenantId }: { tenantId: string }) {
       </div>
 
       {posts.length ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <div className="columns-2 gap-3 md:columns-3 [&>*]:mb-3">
           {posts.map((post) => (
-            <PostCard key={post._id} post={post} />
+            <div key={post._id} className="break-inside-avoid">
+              <PostCard post={post} />
+            </div>
           ))}
         </div>
       ) : (

@@ -1,33 +1,57 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { List, CalendarDays, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { CategoryBadge } from "@/components/shared/CategoryBadge";
+import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/shared/Pagination";
 import { useToast } from "@/components/ui/toast";
+import { AppointmentRow } from "@/components/appointments/AppointmentRow";
+import { BookingsCalendar } from "@/components/appointments/BookingsCalendar";
 import { Appointment, AppointmentStatus } from "@/types";
 
-const STATUS_VARIANT: Record<AppointmentStatus, "outline" | "navy" | "success" | "default"> = {
-  PENDING: "outline",
-  CONFIRMED: "navy",
-  COMPLETED: "success",
-  CANCELLED: "default",
-};
-
-const NEXT_STATUS: Partial<Record<AppointmentStatus, AppointmentStatus>> = {
-  PENDING: "CONFIRMED",
-  CONFIRMED: "COMPLETED",
-};
+interface AppointmentsResponse {
+  appointments: Appointment[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
 
 export default function AppointmentsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const [view, setView] = useState<"list" | "calendar">("list");
+  const [filter, setFilter] = useState<AppointmentStatus | "ALL">("ALL");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const from = dateFrom ? `${dateFrom}T00:00:00` : undefined;
+  const to = dateTo ? `${dateTo}T23:59:59` : undefined;
+
   const { data } = useQuery({
-    queryKey: ["appointments"],
-    queryFn: async () => (await api.get<{ appointments: Appointment[] }>("/api/appointments")).data,
+    queryKey: ["appointments", "list", { page, status: filter, from, to, search }],
+    queryFn: async () =>
+      (
+        await api.get<AppointmentsResponse>("/api/appointments", {
+          params: { page, pageSize: 20, status: filter === "ALL" ? undefined : filter, from, to, search: search || undefined },
+        })
+      ).data,
+    placeholderData: keepPreviousData,
   });
 
   useEffect(() => {
@@ -51,63 +75,123 @@ export default function AppointmentsPage() {
     onError: (err: any) => toast(err.response?.data?.error || "Failed to update", "error"),
   });
 
-  const [filter, setFilter] = useState<AppointmentStatus | "ALL">("ALL");
-  const appointments = (data?.appointments || []).filter(
-    (a) => filter === "ALL" || a.status === filter
-  );
+  const handleUpdateStatus = (id: string, status: AppointmentStatus) => updateStatus.mutate({ id, status });
+
+  const handleFilterChange = (s: AppointmentStatus | "ALL") => {
+    setFilter(s);
+    setPage(1);
+  };
+
+  const handleDateFromChange = (v: string) => {
+    setDateFrom(v);
+    setPage(1);
+  };
+
+  const handleDateToChange = (v: string) => {
+    setDateTo(v);
+    setPage(1);
+  };
+
+  const hasActiveFilters = dateFrom || dateTo || searchInput;
+
+  const clearFilters = () => {
+    setDateFrom("");
+    setDateTo("");
+    setSearchInput("");
+    setSearch("");
+    setPage(1);
+  };
+
+  const appointments = data?.appointments || [];
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        {(["ALL", "PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"] as const).map((s) => (
-          <Button key={s} size="sm" variant={filter === s ? "default" : "outline"} onClick={() => setFilter(s)}>
-            {s}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          {(["ALL", "PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"] as const).map((s) => (
+            <Button
+              key={s}
+              size="sm"
+              variant={filter === s ? "default" : "outline"}
+              onClick={() => handleFilterChange(s)}
+            >
+              {s}
+            </Button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant={view === "list" ? "default" : "outline"} onClick={() => setView("list")}>
+            <List className="h-4 w-4" /> List
           </Button>
-        ))}
+          <Button
+            size="sm"
+            variant={view === "calendar" ? "default" : "outline"}
+            onClick={() => setView("calendar")}
+          >
+            <CalendarDays className="h-4 w-4" /> Calendar
+          </Button>
+        </div>
       </div>
+
+      {view === "list" && (
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-plum-400 dark:text-cream-100/50">From</label>
+            <Input
+              type="date"
+              className="h-9 w-40"
+              value={dateFrom}
+              onChange={(e) => handleDateFromChange(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-plum-400 dark:text-cream-100/50">To</label>
+            <Input
+              type="date"
+              className="h-9 w-40"
+              value={dateTo}
+              onChange={(e) => handleDateToChange(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-plum-400 dark:text-cream-100/50">Customer</label>
+            <Input
+              placeholder="Name or phone"
+              className="h-9 w-48"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+          {hasActiveFilters && (
+            <Button size="sm" variant="ghost" onClick={clearFilters}>
+              <X className="h-4 w-4" /> Clear filters
+            </Button>
+          )}
+        </div>
+      )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Live Availability Grid</CardTitle>
+          <CardTitle>{view === "list" ? "Live Availability Grid" : "Bookings Calendar"}</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col divide-y divide-plum-100 dark:divide-white/10">
-          {appointments.length ? (
-            appointments.map((appt) => (
-              <div key={appt.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-plum-700 dark:text-cream-50">{appt.clientName}</span>
-                    <CategoryBadge category={appt.category} />
-                    <Badge variant={STATUS_VARIANT[appt.status]}>{appt.status}</Badge>
-                  </div>
-                  <p className="text-xs text-plum-400 dark:text-cream-100/50">
-                    {new Date(appt.bookingTime).toLocaleString()} • {appt.staff?.name || "Unassigned"} •{" "}
-                    {appt.services.map((s) => s.service.name).join(", ")}
+        <CardContent>
+          {view === "list" ? (
+            <>
+              <div className="flex flex-col divide-y divide-plum-100 dark:divide-white/10">
+                {appointments.length ? (
+                  appointments.map((appt) => (
+                    <AppointmentRow key={appt.id} appointment={appt} onUpdateStatus={handleUpdateStatus} />
+                  ))
+                ) : (
+                  <p className="py-6 text-center text-sm text-plum-300 dark:text-cream-100/40">
+                    No bookings for this filter.
                   </p>
-                </div>
-                <div className="flex gap-2">
-                  {NEXT_STATUS[appt.status] && (
-                    <Button
-                      size="sm"
-                      onClick={() => updateStatus.mutate({ id: appt.id, status: NEXT_STATUS[appt.status]! })}
-                    >
-                      Mark {NEXT_STATUS[appt.status]}
-                    </Button>
-                  )}
-                  {appt.status !== "CANCELLED" && appt.status !== "COMPLETED" && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => updateStatus.mutate({ id: appt.id, status: "CANCELLED" })}
-                    >
-                      Cancel
-                    </Button>
-                  )}
-                </div>
+                )}
               </div>
-            ))
+              {data && <Pagination page={data.page} totalPages={data.totalPages} onPageChange={setPage} />}
+            </>
           ) : (
-            <p className="py-6 text-center text-sm text-plum-300 dark:text-cream-100/40">No bookings for this filter.</p>
+            <BookingsCalendar status={filter} onUpdateStatus={handleUpdateStatus} />
           )}
         </CardContent>
       </Card>

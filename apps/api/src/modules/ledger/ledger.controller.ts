@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { prisma } from "@/config/prisma";
 import { AuthRequest } from "@/middlewares/requireAuth";
+import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { createLedgerEntrySchema } from "./ledger.schema";
 
 function dayRange(dateStr?: string) {
@@ -14,24 +15,27 @@ function dayRange(dateStr?: string) {
 
 export async function listLedgerEntries(req: AuthRequest, res: Response) {
   const { from, to, type } = req.query as { from?: string; to?: string; type?: string };
+  const { page, pageSize, skip, take } = parsePagination(req.query, 15, 100);
 
-  const entries = await prisma.ledger.findMany({
-    where: {
-      tenantId: req.tenantId!,
-      ...(type ? { type: type as any } : {}),
-      ...(from || to
-        ? {
-            createdAt: {
-              ...(from ? { gte: new Date(from) } : {}),
-              ...(to ? { lte: new Date(to) } : {}),
-            },
-          }
-        : {}),
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const where = {
+    tenantId: req.tenantId!,
+    ...(type ? { type: type as any } : {}),
+    ...(from || to
+      ? {
+          createdAt: {
+            ...(from ? { gte: new Date(from) } : {}),
+            ...(to ? { lte: new Date(to) } : {}),
+          },
+        }
+      : {}),
+  };
 
-  return res.json({ success: true, entries });
+  const [entries, total] = await Promise.all([
+    prisma.ledger.findMany({ where, orderBy: { createdAt: "desc" }, skip, take }),
+    prisma.ledger.count({ where }),
+  ]);
+
+  return res.json({ success: true, entries, ...paginationMeta(total, page, pageSize) });
 }
 
 export async function createLedgerEntry(req: AuthRequest, res: Response) {

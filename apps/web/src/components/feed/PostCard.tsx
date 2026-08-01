@@ -1,10 +1,57 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Heart, MessageCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { getVisitorId } from "@/lib/visitor";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
-import { FeedPost } from "@/types";
+import { FeedMediaItem, FeedPost } from "@/types";
 import { cn } from "@/lib/utils";
+
+function MediaCarousel({ media, alt }: { media: FeedMediaItem[]; alt: string }) {
+  const [index, setIndex] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  function onScroll() {
+    const el = trackRef.current;
+    if (!el) return;
+    setIndex(Math.round(el.scrollLeft / el.clientWidth));
+  }
+
+  const cover = media[0];
+  const coverAspect =
+    cover.type === "video" ? "16 / 9" : cover.width && cover.height ? `${cover.width} / ${cover.height}` : "4 / 5";
+
+  return (
+    <div className="relative w-full" style={{ aspectRatio: coverAspect }}>
+      <div
+        ref={trackRef}
+        onScroll={onScroll}
+        className="flex h-full snap-x snap-mandatory overflow-x-auto scroll-smooth"
+      >
+        {media.map((m, i) => (
+          <div key={i} className="h-full w-full flex-shrink-0 snap-center">
+            {m.type === "video" ? (
+              <video src={m.url} className="h-full w-full object-cover" controls />
+            ) : (
+              <img src={m.url} className="h-full w-full object-cover transition-transform duration-300" alt={alt} />
+            )}
+          </div>
+        ))}
+      </div>
+      {media.length > 1 && (
+        <>
+          <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
+            {index + 1}/{media.length}
+          </span>
+          <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
+            {media.map((_, i) => (
+              <span key={i} className={cn("h-1.5 w-1.5 rounded-full", i === index ? "bg-white" : "bg-white/40")} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export function PostCard({ post }: { post: FeedPost }) {
   const [likeCount, setLikeCount] = useState(post.likeCount);
@@ -27,15 +74,7 @@ export function PostCard({ post }: { post: FeedPost }) {
   return (
     <div className="glass-panel group overflow-hidden">
       <div className="overflow-hidden">
-        {post.mediaType === "video" ? (
-          <video src={post.mediaUrl} className="aspect-square w-full object-cover" controls />
-        ) : (
-          <img
-            src={post.mediaUrl}
-            className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            alt={post.caption || "salon work"}
-          />
-        )}
+        <MediaCarousel media={post.media} alt={post.caption || "salon work"} />
       </div>
       <div className="flex flex-col gap-1 p-3">
         <div className="flex items-center justify-between">
@@ -57,25 +96,42 @@ export function PostCard({ post }: { post: FeedPost }) {
   );
 }
 
+type CommentItem = { _id: string; authorName: string; text: string };
+
 function CommentsSection({ postId }: { postId: string }) {
-  const [comments, setComments] = useState<{ _id: string; authorName: string; text: string }[] | null>(null);
+  const [comments, setComments] = useState<CommentItem[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [name, setName] = useState("");
   const [text, setText] = useState("");
 
-  async function load() {
-    const res = await api.get(`/api/feed/${postId}/comments`);
-    setComments(res.data.comments);
+  async function load(targetPage: number, append: boolean) {
+    const res = await api.get(`/api/feed/${postId}/comments`, { params: { page: targetPage } });
+    setComments((prev) => (append && prev ? [...prev, ...res.data.comments] : res.data.comments));
+    setPage(res.data.page);
+    setTotalPages(res.data.totalPages);
+  }
+
+  useEffect(() => {
+    load(1, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId]);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    await load(page + 1, true);
+    setLoadingMore(false);
   }
 
   async function submit() {
     if (!name || !text) return;
     await api.post(`/api/feed/${postId}/comments`, { authorName: name, text });
     setText("");
-    load();
+    load(1, false);
   }
 
   if (comments === null) {
-    load();
     return <p className="text-xs text-plum-300 dark:text-cream-100/40">Loading comments...</p>;
   }
 
@@ -86,6 +142,15 @@ function CommentsSection({ postId }: { postId: string }) {
           <span className="font-semibold text-plum-800 dark:text-cream-50">{c.authorName}:</span> {c.text}
         </p>
       ))}
+      {page < totalPages && (
+        <button
+          onClick={loadMore}
+          disabled={loadingMore}
+          className="self-start text-xs font-medium text-brand-500 hover:underline"
+        >
+          {loadingMore ? "Loading..." : "Load more comments"}
+        </button>
+      )}
       <div className="flex gap-1">
         <input
           className="h-8 flex-1 rounded-lg border border-plum-100 bg-white/90 px-2 text-xs dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"

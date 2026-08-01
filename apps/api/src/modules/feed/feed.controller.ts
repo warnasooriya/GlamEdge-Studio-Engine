@@ -1,32 +1,46 @@
 import { Response, Request } from "express";
 import { v4 as uuid } from "uuid";
+import { imageSize } from "image-size";
 import { Post } from "@/models/Post";
 import { Comment } from "@/models/Comment";
 import { Like } from "@/models/Like";
 import { AuthRequest } from "@/middlewares/requireAuth";
 import { HttpError } from "@/middlewares/errorHandler";
 import { storageProvider } from "@/services/storage";
+import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { createPostSchema, likeSchema, commentSchema } from "./feed.schema";
 
-interface UploadRequest extends AuthRequest {
-  file?: Express.Multer.File;
-}
+export async function createPost(req: AuthRequest, res: Response) {
+  const files = req.files as Express.Multer.File[] | undefined;
+  if (!files?.length) throw new HttpError(400, "At least one media file is required");
+  if (files.length > 10) throw new HttpError(400, "Maximum 10 media files per post");
 
-export async function createPost(req: UploadRequest, res: Response) {
-  if (!req.file) throw new HttpError(400, "Media file is required");
   const data = createPostSchema.parse(req.body);
 
-  const ext = req.file.mimetype.split("/")[1];
-  const key = `feed/${req.tenantId}/${uuid()}.${ext}`;
-  const mediaUrl = await storageProvider.upload(key, req.file.buffer, req.file.mimetype);
+  const media = await Promise.all(
+    files.map(async (file) => {
+      const ext = file.mimetype.split("/")[1];
+      const key = `feed/${req.tenantId}/${uuid()}.${ext}`;
+      const url = await storageProvider.upload(key, file.buffer, file.mimetype);
+
+      if (file.mimetype.startsWith("video")) {
+        return { url, type: "video" as const };
+      }
+      try {
+        const { width, height } = imageSize(file.buffer);
+        return { url, type: "image" as const, width, height };
+      } catch {
+        return { url, type: "image" as const };
+      }
+    })
+  );
 
   const post = await Post.create({
     tenantId: req.tenantId,
     staffId: data.staffId,
     staffName: data.staffName,
     category: data.category,
-    mediaUrl,
-    mediaType: req.file.mimetype.startsWith("video") ? "video" : "image",
+    media,
     caption: data.caption,
     tags: data.tags,
   });
@@ -107,8 +121,14 @@ export async function addComment(req: Request, res: Response) {
 
 export async function listComments(req: Request, res: Response) {
   const { postId } = req.params;
-  const comments = await Comment.find({ postId }).sort({ createdAt: 1 });
-  return res.json({ success: true, comments });
+  const { page, pageSize, skip, take } = parsePagination(req.query, 20, 100);
+
+  const [comments, total] = await Promise.all([
+    Comment.find({ postId }).sort({ createdAt: -1 }).skip(skip).limit(take),
+    Comment.countDocuments({ postId }),
+  ]);
+
+  return res.json({ success: true, comments, ...paginationMeta(total, page, pageSize) });
 }
 
 export async function deletePost(req: AuthRequest, res: Response) {

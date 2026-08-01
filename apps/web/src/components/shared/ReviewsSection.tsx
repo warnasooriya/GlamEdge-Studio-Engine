@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Star } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -8,15 +8,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { Review } from "@/types";
 
+interface ReviewsPage {
+  reviews: Review[];
+  avgRating: number;
+  count: number;
+  page: number;
+  totalPages: number;
+}
+
 export function ReviewsSection({ slug }: { slug: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data } = useQuery({
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["reviews", slug],
-    queryFn: async () =>
-      (await api.get<{ reviews: Review[]; avgRating: number; count: number }>(`/api/reviews/public/${slug}`)).data,
+    queryFn: async ({ pageParam }: { pageParam: number }) =>
+      (await api.get<ReviewsPage>(`/api/reviews/public/${slug}`, { params: { page: pageParam } })).data,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined),
   });
+
+  const reviews = data?.pages.flatMap((p) => p.reviews) || [];
+  const summary = data?.pages[0];
 
   const [appointmentId, setAppointmentId] = useState("");
   const [rating, setRating] = useState(5);
@@ -41,7 +54,9 @@ export function ReviewsSection({ slug }: { slug: string }) {
           <Star className="h-5 w-5 fill-current" />
         </div>
         <p className="font-display text-lg font-semibold text-plum-800 dark:text-cream-50">
-          {data ? `${data.avgRating.toFixed(1)} · ${data.count} verified review${data.count === 1 ? "" : "s"}` : "Loading..."}
+          {summary
+            ? `${summary.avgRating.toFixed(1)} · ${summary.count} verified review${summary.count === 1 ? "" : "s"}`
+            : "Loading..."}
         </p>
       </div>
 
@@ -74,7 +89,7 @@ export function ReviewsSection({ slug }: { slug: string }) {
       </div>
 
       <div className="flex flex-col gap-2">
-        {data?.reviews.map((r) => (
+        {reviews.map((r) => (
           <div key={r.id} className="glass-panel p-4 text-sm">
             <div className="flex items-center justify-between">
               <span className="font-medium text-plum-700 dark:text-cream-50">{r.clientName}</span>
@@ -84,6 +99,12 @@ export function ReviewsSection({ slug }: { slug: string }) {
           </div>
         ))}
       </div>
+
+      {hasNextPage && (
+        <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+          {isFetchingNextPage ? "Loading..." : "Load more"}
+        </Button>
+      )}
     </div>
   );
 }

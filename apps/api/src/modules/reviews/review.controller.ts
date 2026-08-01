@@ -1,6 +1,7 @@
 import { Response, Request } from "express";
 import { prisma } from "@/config/prisma";
 import { HttpError } from "@/middlewares/errorHandler";
+import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { createReviewSchema } from "./review.schema";
 
 // Verified Review Engine: only clients with a completed, billed appointment
@@ -52,14 +53,20 @@ export async function listPublicReviews(req: Request, res: Response) {
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
   if (!tenant) throw new HttpError(404, "Salon not found");
 
-  const reviews = await prisma.review.findMany({
-    where: { tenantId: tenant.id },
-    orderBy: { createdAt: "desc" },
+  const { page, pageSize, skip, take } = parsePagination(req.query, 10, 50);
+  const where = { tenantId: tenant.id };
+
+  const [reviews, total, aggregate] = await Promise.all([
+    prisma.review.findMany({ where, orderBy: { createdAt: "desc" }, skip, take }),
+    prisma.review.count({ where }),
+    prisma.review.aggregate({ where, _avg: { rating: true } }),
+  ]);
+
+  return res.json({
+    success: true,
+    reviews,
+    avgRating: aggregate._avg.rating ?? 0,
+    count: total,
+    ...paginationMeta(total, page, pageSize),
   });
-
-  const avgRating = reviews.length
-    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-    : 0;
-
-  return res.json({ success: true, reviews, avgRating, count: reviews.length });
 }

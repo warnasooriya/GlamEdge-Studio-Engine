@@ -7,41 +7,34 @@ interface WhatsAppInvoicePayload {
   salonName: string;
   totalAmount: string;
   pdfInvoiceUrl: string;
+  receiptImageUrl: string;
 }
 
 export const sendWhatsAppInvoice = async (payload: WhatsAppInvoicePayload) => {
-  const { clientPhone, clientName, salonName, totalAmount, pdfInvoiceUrl } = payload;
+  const { clientPhone, salonName, totalAmount, receiptImageUrl } = payload;
 
   const formattedPhone = clientPhone.startsWith("0") ? `94${clientPhone.slice(1)}` : clientPhone;
+  const caption = `${salonName} — Total LKR ${totalAmount}. Thank you for visiting!`;
 
   if (!isWhatsAppConfigured) {
     console.log(
-      `[whatsapp:dev-stub] Would send invoice to ${formattedPhone}: ${salonName} — LKR ${totalAmount} — ${pdfInvoiceUrl} (set WHATSAPP_CLOUD_API_TOKEN / WHATSAPP_PHONE_NUMBER_ID to send for real)`
+      `[whatsapp:dev-stub] Would send receipt image to ${formattedPhone}: ${caption} — ${receiptImageUrl} (set WHATSAPP_CLOUD_API_TOKEN / WHATSAPP_PHONE_NUMBER_ID to send for real)`
     );
     return { stubbed: true };
   }
 
+  // Freeform image messages only deliver within WhatsApp's 24-hour customer-service
+  // window; outside that window Meta requires a pre-approved template instead.
   try {
     const response = await axios.post(
       `https://graph.facebook.com/v18.0/${env.whatsapp.phoneNumberId}/messages`,
       {
         messaging_product: "whatsapp",
         to: formattedPhone,
-        type: "template",
-        template: {
-          name: "salon_invoice_receipt",
-          language: { code: "en" },
-          components: [
-            {
-              type: "body",
-              parameters: [
-                { type: "text", text: clientName },
-                { type: "text", text: salonName },
-                { type: "text", text: totalAmount },
-                { type: "text", text: pdfInvoiceUrl },
-              ],
-            },
-          ],
+        type: "image",
+        image: {
+          link: receiptImageUrl,
+          caption,
         },
       },
       {

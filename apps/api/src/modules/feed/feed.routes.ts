@@ -19,5 +19,5 @@ feedRouter.post("/:postId/unlike", unlikePost);
 feedRouter.get("/:postId/comments", listComments);
 feedRouter.post("/:postId/comments", addComment);
 
-feedRouter.post("/", requireAuth, uploadMedia.single("media"), createPost);
+feedRouter.post("/", requireAuth, uploadMedia.array("media", 10), createPost);
 feedRouter.delete("/:postId", requireAuth, deletePost);
