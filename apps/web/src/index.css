@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-glass-surface dark:bg-glass-darkSurface backdrop-blur-glass border border-glass-border rounded-lg shadow-sm;
+  }
+}
