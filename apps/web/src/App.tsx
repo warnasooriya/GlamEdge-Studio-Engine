@@ -12,6 +12,11 @@ import POSPage from "@/pages/pos/POSPage";
 import SalonPublicPage from "@/pages/public/SalonPublicPage";
 import LandingPage from "@/pages/public/LandingPage";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
+import ClientLayout from "@/pages/client/ClientLayout";
+import ClientDashboardHome from "@/pages/client/ClientDashboardHome";
+import ClientHistoryPage from "@/pages/client/ClientHistoryPage";
+import ClientNotificationsPage from "@/pages/client/ClientNotificationsPage";
+import ClientProfilePage from "@/pages/client/ClientProfilePage";
 
 export default function App() {
   return (
@@ -19,6 +24,13 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={<OnboardingPage />} />
       <Route path="/salon/:slug" element={<SalonPublicPage />} />
+
+      <Route path="/account" element={<ClientLayout />}>
+        <Route index element={<ClientDashboardHome />} />
+        <Route path="history" element={<ClientHistoryPage />} />
+        <Route path="notifications" element={<ClientNotificationsPage />} />
+        <Route path="profile" element={<ClientProfilePage />} />
+      </Route>
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardLayout />}>

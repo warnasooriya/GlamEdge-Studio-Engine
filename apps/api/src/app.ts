@@ -16,6 +16,7 @@ import { billingRouter } from "@/modules/billing/billing.routes";
 import { feedRouter } from "@/modules/feed/feed.routes";
 import { reviewRouter } from "@/modules/reviews/review.routes";
 import { clientRouter } from "@/modules/clients/client.routes";
+import { notificationRouter } from "@/modules/notifications/notification.routes";
 
 export const app = express();
 
@@ -38,5 +39,6 @@ app.use("/api/billing", billingRouter);
 app.use("/api/feed", feedRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/clients", clientRouter);
+app.use("/api/notifications", notificationRouter);
 
 app.use(errorHandler);

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { CheckCircle2, Clock } from "lucide-react";
+import { CheckCircle2, Clock, UserCircle } from "lucide-react";
 import { clientApi } from "@/lib/clientApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,13 +85,18 @@ export function BookingForm({ slug, services, staff }: Props) {
 
   return (
     <div className="glass-panel flex flex-col gap-4 p-5">
-      <div className="flex items-center justify-between text-xs text-plum-400 dark:text-cream-100/50">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-plum-400 dark:text-cream-100/50">
         <span>
           Booking as <span className="font-semibold text-plum-600 dark:text-cream-100/80">{client.phone}</span>
         </span>
-        <button onClick={() => dispatch(clientLogout())} className="font-medium text-brand-500 hover:underline">
-          Not you? Log out
-        </button>
+        <div className="flex items-center gap-3">
+          <Link to="/account" className="flex items-center gap-1 font-medium text-brand-500 hover:underline">
+            <UserCircle className="h-3.5 w-3.5" /> My Account
+          </Link>
+          <button onClick={() => dispatch(clientLogout())} className="font-medium text-brand-500 hover:underline">
+            Not you? Log out
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2">

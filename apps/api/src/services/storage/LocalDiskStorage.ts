@@ -16,4 +16,13 @@ export class LocalDiskStorage implements StorageProvider {
   getUrl(key: string): string {
     return `http://localhost:${env.port}/uploads/${key}`;
   }
+
+  async getSignedUrl(key: string): Promise<string> {
+    // Local disk files are already served publicly via express.static — no signing needed.
+    return this.getUrl(key);
+  }
+
+  async resolveUrl(storedUrl: string): Promise<string> {
+    return storedUrl;
+  }
 }

@@ -5,6 +5,9 @@ import { ClientAuthRequest } from "@/middlewares/requireClientAuth";
 import { HttpError } from "@/middlewares/errorHandler";
 import { emitToTenant } from "@/realtime/socket";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
+import { sendWhatsAppText } from "@/services/whatsapp/whatsappService";
+import { createNotification } from "@/services/notifications/notificationService";
+import { storageProvider } from "@/services/storage";
 import { createAppointmentSchema, updateStatusSchema } from "./appointment.schema";
 
 const APPOINTMENT_INCLUDE = {
@@ -97,7 +100,60 @@ export async function createPublicAppointment(req: ClientAuthRequest, res: Respo
 
   emitToTenant(tenant.id, "appointment:created", appointment);
 
+  const serviceNames = appointment.services.map((s) => s.service.name).join(", ");
+  const requestedMessage = `Your booking for ${serviceNames} at ${tenant.salonName} on ${appointment.bookingTime.toLocaleString()} has been received and is pending confirmation. We'll notify you once it's confirmed!`;
+
+  try {
+    await sendWhatsAppText(appointment.clientPhone, `Hi ${appointment.clientName}! ${requestedMessage}`);
+  } catch (err) {
+    console.error("WhatsApp booking-requested dispatch failed:", err);
+  }
+
+  if (appointment.clientId) {
+    try {
+      await createNotification({
+        clientId: appointment.clientId,
+        tenantId: tenant.id,
+        appointmentId: appointment.id,
+        type: "BOOKING_REQUESTED",
+        title: "Booking requested",
+        message: requestedMessage,
+      });
+    } catch (err) {
+      console.error("Notification create failed:", err);
+    }
+  }
+
   return res.status(201).json({ success: true, appointment });
+}
+
+export async function listMyAppointments(req: ClientAuthRequest, res: Response) {
+  const clientId = req.clientAuth!.clientId;
+  const { page, pageSize, skip, take } = parsePagination(req.query, 10, 50);
+  const where = { clientId };
+
+  const [appointments, total] = await Promise.all([
+    prisma.appointment.findMany({
+      where,
+      include: {
+        ...APPOINTMENT_INCLUDE,
+        tenant: { select: { salonName: true, slug: true, logoUrl: true } },
+      },
+      orderBy: { bookingTime: "desc" },
+      skip,
+      take,
+    }),
+    prisma.appointment.count({ where }),
+  ]);
+
+  const resolvedAppointments = await Promise.all(
+    appointments.map(async (a) => ({
+      ...a,
+      tenant: { ...a.tenant, logoUrl: a.tenant.logoUrl ? await storageProvider.resolveUrl(a.tenant.logoUrl) : a.tenant.logoUrl },
+    }))
+  );
+
+  return res.json({ success: true, appointments: resolvedAppointments, ...paginationMeta(total, page, pageSize) });
 }
 
 export async function getAvailability(req: Request, res: Response) {
@@ -141,6 +197,43 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response) {
   });
 
   emitToTenant(req.tenantId!, "appointment:updated", appointment);
+
+  if (status === "CONFIRMED" || status === "CANCELLED") {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: req.tenantId! },
+      select: { salonName: true },
+    });
+    const serviceNames = appointment.services.map((s) => s.service.name).join(", ");
+
+    if (status === "CONFIRMED") {
+      try {
+        await sendWhatsAppText(
+          appointment.clientPhone,
+          `Hi ${appointment.clientName}! Your appointment at ${tenant?.salonName} on ${appointment.bookingTime.toLocaleString()} for ${serviceNames} has been confirmed. See you soon!`
+        );
+      } catch (err) {
+        console.error("WhatsApp booking-confirmed dispatch failed:", err);
+      }
+    }
+
+    if (appointment.clientId && tenant) {
+      try {
+        await createNotification({
+          clientId: appointment.clientId,
+          tenantId: req.tenantId!,
+          appointmentId: appointment.id,
+          type: status === "CONFIRMED" ? "BOOKING_CONFIRMED" : "BOOKING_CANCELLED",
+          title: status === "CONFIRMED" ? "Booking confirmed" : "Booking cancelled",
+          message:
+            status === "CONFIRMED"
+              ? `Your appointment at ${tenant.salonName} on ${appointment.bookingTime.toLocaleString()} for ${serviceNames} has been confirmed.`
+              : `Your appointment at ${tenant.salonName} on ${appointment.bookingTime.toLocaleString()} has been cancelled.`,
+        });
+      } catch (err) {
+        console.error("Notification create failed:", err);
+      }
+    }
+  }
 
   return res.json({ success: true, appointment });
 }

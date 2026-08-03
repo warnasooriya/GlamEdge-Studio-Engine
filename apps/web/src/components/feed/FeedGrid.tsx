@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { PortfolioLightbox } from "@/components/shared/PortfolioLightbox";
 import { PostCard } from "./PostCard";
 import { CategoryType, FeedPost } from "@/types";
 
-export function FeedGrid({ tenantId }: { tenantId: string }) {
+export function FeedGrid({ tenantId, salonName }: { tenantId: string; salonName: string }) {
   const [category, setCategory] = useState<CategoryType | "ALL">("ALL");
+  const [viewerPostId, setViewerPostId] = useState<string | null>(null);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["feed", tenantId, category],
@@ -36,7 +38,7 @@ export function FeedGrid({ tenantId }: { tenantId: string }) {
         <div className="columns-2 gap-3 md:columns-3 [&>*]:mb-3">
           {posts.map((post) => (
             <div key={post._id} className="break-inside-avoid">
-              <PostCard post={post} />
+              <PostCard post={post} onOpenViewer={() => setViewerPostId(post._id)} />
             </div>
           ))}
         </div>
@@ -48,6 +50,16 @@ export function FeedGrid({ tenantId }: { tenantId: string }) {
         <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
           {isFetchingNextPage ? "Loading..." : "Load more"}
         </Button>
+      )}
+
+      {viewerPostId && (
+        <PortfolioLightbox
+          tenantId={tenantId}
+          salonName={salonName}
+          open={!!viewerPostId}
+          onOpenChange={(next) => !next && setViewerPostId(null)}
+          initialPostId={viewerPostId}
+        />
       )}
     </div>
   );

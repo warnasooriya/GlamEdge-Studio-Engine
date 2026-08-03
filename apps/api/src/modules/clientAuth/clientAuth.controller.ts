@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { z } from "zod";
 import { prisma } from "@/config/prisma";
 import { HttpError } from "@/middlewares/errorHandler";
 import { otpProvider } from "@/services/otp";
@@ -6,6 +7,10 @@ import { issueOtp, verifyOtp, consumeOtp } from "@/services/otp/otpStore";
 import { signClientToken } from "@/utils/clientJwt";
 import { ClientAuthRequest } from "@/middlewares/requireClientAuth";
 import { requestClientOtpSchema, verifyClientOtpSchema } from "./clientAuth.schema";
+
+const updateClientSchema = z.object({
+  name: z.string().min(2).max(191),
+});
 
 export async function requestClientOtp(req: Request, res: Response) {
   const { phone } = requestClientOtpSchema.parse(req.body);
@@ -40,5 +45,14 @@ export async function verifyClientOtpAndAuth(req: Request, res: Response) {
 export async function getClientMe(req: ClientAuthRequest, res: Response) {
   const client = await prisma.client.findUnique({ where: { id: req.clientAuth!.clientId } });
   if (!client) throw new HttpError(404, "Client not found");
+  return res.json({ success: true, client });
+}
+
+export async function updateClientMe(req: ClientAuthRequest, res: Response) {
+  const data = updateClientSchema.parse(req.body);
+  const client = await prisma.client.update({
+    where: { id: req.clientAuth!.clientId },
+    data,
+  });
   return res.json({ success: true, client });
 }

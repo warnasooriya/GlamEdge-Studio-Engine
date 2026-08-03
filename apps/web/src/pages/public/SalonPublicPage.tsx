@@ -118,7 +118,7 @@ export default function SalonPublicPage() {
               <BookingForm slug={slug} services={tenant.services} staff={tenant.staff} />
             </ClientLoginGate>
           )}
-          {tab === "feed" && <FeedGrid tenantId={tenant.id} />}
+          {tab === "feed" && <FeedGrid tenantId={tenant.id} salonName={tenant.salonName} />}
           {tab === "reviews" && <ReviewsSection slug={slug} />}
         </div>
       </div>

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,13 @@ import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { useToast } from "@/components/ui/toast";
 import { formatCurrency } from "@/lib/utils";
 import { CategoryType, Service } from "@/types";
+
+interface ServiceTemplate {
+  category: CategoryType;
+  name: string;
+  price: number;
+  durationMin: number;
+}
 
 export default function ServicesPage() {
   const { toast } = useToast();
@@ -27,6 +35,19 @@ export default function ServicesPage() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [durationMin, setDurationMin] = useState("30");
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [templateCategory, setTemplateCategory] = useState<CategoryType | "ALL">("ALL");
+  const addFormRef = useRef<HTMLDivElement>(null);
+
+  const templates: ServiceTemplate[] = templatesData?.templates || [];
+  const filteredTemplates = useMemo(() => {
+    const q = templateSearch.trim().toLowerCase();
+    return templates.filter((t) => {
+      if (templateCategory !== "ALL" && t.category !== templateCategory) return false;
+      if (q && !t.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [templates, templateSearch, templateCategory]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["services"] });
 
@@ -42,19 +63,26 @@ export default function ServicesPage() {
     onError: (err: any) => toast(err.response?.data?.error || "Failed to add service", "error"),
   });
 
-  const applyTemplate = useMutation({
-    mutationFn: async (tpl: (typeof templatesData.templates)[number]) => api.post("/api/services", tpl),
-    onSuccess: invalidate,
-  });
-
   const deleteService = useMutation({
     mutationFn: async (id: string) => api.delete(`/api/services/${id}`),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      toast("Service removed", "success");
+      invalidate();
+    },
+    onError: (err: any) => toast(err.response?.data?.error || "Failed to remove service", "error"),
   });
+
+  function loadTemplateIntoForm(tpl: ServiceTemplate) {
+    setCategory(tpl.category);
+    setName(tpl.name);
+    setPrice(String(tpl.price));
+    setDurationMin(String(tpl.durationMin));
+    addFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
+      <Card ref={addFormRef}>
         <CardHeader>
           <CardTitle>Add Service</CardTitle>
         </CardHeader>
@@ -77,17 +105,52 @@ export default function ServicesPage() {
         </CardContent>
       </Card>
 
-      {templatesData?.templates && (
+      {templates.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Quick-add Presets</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {templatesData.templates.map((tpl: any) => (
-              <Button key={tpl.name} size="sm" variant="outline" onClick={() => applyTemplate.mutate(tpl)}>
-                {tpl.name} · {formatCurrency(tpl.price)}
-              </Button>
-            ))}
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative max-w-xs flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-plum-300" />
+                <Input
+                  value={templateSearch}
+                  onChange={(e) => setTemplateSearch(e.target.value)}
+                  placeholder="Search presets..."
+                  className="pl-9"
+                />
+              </div>
+              <div className="flex gap-1.5">
+                {(["ALL", "LADIES", "GENTS", "KIDS"] as const).map((c) => (
+                  <Button
+                    key={c}
+                    size="sm"
+                    variant={templateCategory === c ? "default" : "outline"}
+                    onClick={() => setTemplateCategory(c)}
+                  >
+                    {c === "ALL" ? "All" : c === "LADIES" ? "Ladies" : c === "GENTS" ? "Gents" : "Kids"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            {filteredTemplates.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {filteredTemplates.map((tpl) => (
+                  <Button
+                    key={tpl.name}
+                    size="sm"
+                    variant="outline"
+                    onClick={() => loadTemplateIntoForm(tpl)}
+                    title="Load into Add Service — you can change price and duration before adding"
+                  >
+                    {tpl.name} · {formatCurrency(tpl.price)}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-plum-300 dark:text-cream-100/40">No presets match this filter.</p>
+            )}
           </CardContent>
         </Card>
       )}

@@ -10,6 +10,10 @@ import { storageProvider } from "@/services/storage";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { createPostSchema, likeSchema, commentSchema } from "./feed.schema";
 
+async function resolveMediaUrls<T extends { url: string }>(media: T[]): Promise<T[]> {
+  return Promise.all(media.map(async (m) => ({ ...m, url: await storageProvider.resolveUrl(m.url) })));
+}
+
 export async function createPost(req: AuthRequest, res: Response) {
   const files = req.files as Express.Multer.File[] | undefined;
   if (!files?.length) throw new HttpError(400, "At least one media file is required");
@@ -45,7 +49,8 @@ export async function createPost(req: AuthRequest, res: Response) {
     tags: data.tags,
   });
 
-  return res.status(201).json({ success: true, post });
+  const resolvedPost = { ...post.toObject(), media: await resolveMediaUrls(post.media) };
+  return res.status(201).json({ success: true, post: resolvedPost });
 }
 
 export async function listPublicFeed(req: Request, res: Response) {
@@ -62,7 +67,11 @@ export async function listPublicFeed(req: Request, res: Response) {
 
   const nextCursor = posts.length ? posts[posts.length - 1]._id.toString() : null;
 
-  return res.json({ success: true, posts, nextCursor });
+  const resolvedPosts = await Promise.all(
+    posts.map(async (p) => ({ ...p.toObject(), media: await resolveMediaUrls(p.media) }))
+  );
+
+  return res.json({ success: true, posts: resolvedPosts, nextCursor });
 }
 
 export async function likePost(req: Request, res: Response) {

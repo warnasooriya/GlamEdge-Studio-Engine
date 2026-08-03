@@ -2,6 +2,8 @@ import { Response, Request } from "express";
 import { prisma } from "@/config/prisma";
 import { HttpError } from "@/middlewares/errorHandler";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
+import { sendWhatsAppText } from "@/services/whatsapp/whatsappService";
+import { createNotification } from "@/services/notifications/notificationService";
 import { createReviewSchema } from "./review.schema";
 
 // Verified Review Engine: only clients with a completed, billed appointment
@@ -44,6 +46,30 @@ export async function createVerifiedReview(req: Request, res: Response) {
       isVerified: true,
     },
   });
+
+  try {
+    await sendWhatsAppText(
+      appointment.clientPhone,
+      `Thank you ${appointment.clientName} for your ${rating}-star review of ${tenant.salonName}! We appreciate your feedback.`
+    );
+  } catch (err) {
+    console.error("WhatsApp review-thanks dispatch failed:", err);
+  }
+
+  if (appointment.clientId) {
+    try {
+      await createNotification({
+        clientId: appointment.clientId,
+        tenantId: tenant.id,
+        appointmentId: appointment.id,
+        type: "REVIEW_THANKS",
+        title: "Thanks for your review",
+        message: `Thank you for your ${rating}-star review of ${tenant.salonName}! We appreciate your feedback.`,
+      });
+    } catch (err) {
+      console.error("Notification create failed:", err);
+    }
+  }
 
   return res.status(201).json({ success: true, review });
 }

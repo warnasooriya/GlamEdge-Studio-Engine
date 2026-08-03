@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Pencil, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, X, Play } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
+import { PortfolioLightbox } from "@/components/shared/PortfolioLightbox";
 import { useToast } from "@/components/ui/toast";
 import { useAppSelector } from "@/hooks/redux";
 import { CategoryType, FeedPost } from "@/types";
@@ -34,6 +35,7 @@ export default function FeedManagePage() {
   });
 
   const [category, setCategory] = useState<CategoryType>("LADIES");
+  const [viewerPostId, setViewerPostId] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
   const [staged, setStaged] = useState<StagedMedia[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -218,18 +220,28 @@ export default function FeedManagePage() {
               const first = post.media[0];
               return (
                 <div key={post._id} className="flex flex-col gap-1.5 rounded-xl border border-plum-100 p-2 dark:border-white/10">
-                  <div className="relative overflow-hidden rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setViewerPostId(post._id)}
+                    className="relative overflow-hidden rounded-lg"
+                    aria-label="View post"
+                  >
                     {first.type === "video" ? (
-                      <video src={first.url} className="aspect-square w-full object-cover" />
+                      <video src={first.url} className="aspect-square w-full object-cover" muted playsInline preload="metadata" />
                     ) : (
                       <img src={first.url} className="aspect-square w-full object-cover" alt="" />
+                    )}
+                    {first.type === "video" && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/15">
+                        <Play className="h-6 w-6 fill-white text-white drop-shadow" />
+                      </span>
                     )}
                     {post.media.length > 1 && (
                       <span className="absolute right-1.5 top-1.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
                         1/{post.media.length}
                       </span>
                     )}
-                  </div>
+                  </button>
                   <CategoryBadge category={post.category} />
                   <p className="text-xs text-plum-400 dark:text-cream-100/50">
                     {post.likeCount} likes • {post.commentCount} comments
@@ -253,6 +265,16 @@ export default function FeedManagePage() {
           imageSrc={editingItem.previewUrl}
           onSave={(blob) => handleEditSave(editingItem.id, blob)}
           onCancel={() => setEditingId(null)}
+        />
+      )}
+
+      {viewerPostId && tenant && (
+        <PortfolioLightbox
+          tenantId={tenant.id}
+          salonName={tenant.salonName}
+          open={!!viewerPostId}
+          onOpenChange={(next) => !next && setViewerPostId(null)}
+          initialPostId={viewerPostId}
         />
       )}
     </div>

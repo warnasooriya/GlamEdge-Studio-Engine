@@ -119,6 +119,30 @@ export interface CustomerDetail {
   reviews: Review[];
 }
 
+export type NotificationType =
+  | "BOOKING_REQUESTED"
+  | "BOOKING_CONFIRMED"
+  | "BOOKING_CANCELLED"
+  | "REVIEW_THANKS"
+  | "INVOICE_READY";
+
+export interface AppNotification {
+  id: string;
+  clientId: string;
+  tenantId: string;
+  appointmentId?: string | null;
+  type: NotificationType;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  tenant: { salonName: string; slug: string; logoUrl?: string | null };
+}
+
+export interface ClientAppointment extends Appointment {
+  tenant: { salonName: string; slug: string; logoUrl?: string | null };
+}
+
 export interface Invoice {
   id: string;
   appointmentId: string;

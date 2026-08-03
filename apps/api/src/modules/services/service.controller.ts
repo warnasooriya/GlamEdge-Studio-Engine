@@ -6,7 +6,7 @@ import { createServiceSchema, updateServiceSchema } from "./service.schema";
 
 export async function listServices(req: AuthRequest, res: Response) {
   const services = await prisma.service.findMany({
-    where: { tenantId: req.tenantId! },
+    where: { tenantId: req.tenantId!, isActive: true },
     orderBy: { createdAt: "asc" },
   });
   return res.json({ success: true, services });

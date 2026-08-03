@@ -8,6 +8,7 @@ import { signToken } from "@/utils/jwt";
 import { requestOtpSchema, verifyOtpSchema } from "./auth.schema";
 import { AuthRequest } from "@/middlewares/requireAuth";
 import { Request } from "express";
+import { storageProvider } from "@/services/storage";
 
 export async function requestOtp(req: Request, res: Response) {
   const { phone } = requestOtpSchema.parse(req.body);
@@ -38,6 +39,7 @@ export async function verifyOtpAndAuth(req: Request, res: Response) {
 
   await consumeOtp(phone);
 
+  if (tenant.logoUrl) tenant.logoUrl = await storageProvider.resolveUrl(tenant.logoUrl);
   const token = signToken({ tenantId: tenant.id, phone: tenant.phone });
   return res.status(200).json({ success: true, token, tenant });
 }
@@ -45,5 +47,6 @@ export async function verifyOtpAndAuth(req: Request, res: Response) {
 export async function getMe(req: AuthRequest, res: Response) {
   const tenant = await prisma.tenant.findUnique({ where: { id: req.auth!.tenantId } });
   if (!tenant) throw new HttpError(404, "Tenant not found");
+  if (tenant.logoUrl) tenant.logoUrl = await storageProvider.resolveUrl(tenant.logoUrl);
   return res.json({ success: true, tenant });
 }

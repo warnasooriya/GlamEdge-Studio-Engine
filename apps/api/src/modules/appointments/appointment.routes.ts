@@ -6,12 +6,14 @@ import {
   createPublicAppointment,
   getAvailability,
   updateAppointmentStatus,
+  listMyAppointments,
 } from "./appointment.controller";
 
 export const appointmentRouter = Router();
 
 appointmentRouter.get("/public/:slug/availability", getAvailability);
 appointmentRouter.post("/public/:slug", requireClientAuth, createPublicAppointment);
+appointmentRouter.get("/me", requireClientAuth, listMyAppointments);
 
 appointmentRouter.use(requireAuth);
 appointmentRouter.get("/", listAppointments);

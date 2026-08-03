@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle } from "lucide-react";
+import { Heart, MessageCircle, Play, Maximize2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { getVisitorId } from "@/lib/visitor";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { FeedMediaItem, FeedPost } from "@/types";
 import { cn } from "@/lib/utils";
 
-function MediaCarousel({ media, alt }: { media: FeedMediaItem[]; alt: string }) {
+function MediaCarousel({ media, alt, onOpenViewer }: { media: FeedMediaItem[]; alt: string; onOpenViewer: () => void }) {
   const [index, setIndex] = useState(0);
   const trackRef = useRef<HTMLDivElement>(null);
 
@@ -21,25 +21,39 @@ function MediaCarousel({ media, alt }: { media: FeedMediaItem[]; alt: string }) 
     cover.type === "video" ? "16 / 9" : cover.width && cover.height ? `${cover.width} / ${cover.height}` : "4 / 5";
 
   return (
-    <div className="relative w-full" style={{ aspectRatio: coverAspect }}>
+    <button
+      type="button"
+      onClick={onOpenViewer}
+      className="group/media relative w-full text-left"
+      style={{ aspectRatio: coverAspect }}
+      aria-label="View full portfolio"
+    >
       <div
         ref={trackRef}
         onScroll={onScroll}
         className="flex h-full snap-x snap-mandatory overflow-x-auto scroll-smooth"
       >
         {media.map((m, i) => (
-          <div key={i} className="h-full w-full flex-shrink-0 snap-center">
+          <div key={i} className="relative h-full w-full flex-shrink-0 snap-center">
             {m.type === "video" ? (
-              <video src={m.url} className="h-full w-full object-cover" controls />
+              <video src={m.url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
             ) : (
               <img src={m.url} className="h-full w-full object-cover transition-transform duration-300" alt={alt} />
+            )}
+            {m.type === "video" && (
+              <span className="absolute inset-0 flex items-center justify-center bg-black/15">
+                <Play className="h-8 w-8 fill-white text-white drop-shadow" />
+              </span>
             )}
           </div>
         ))}
       </div>
+      <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/60 p-1.5 text-white opacity-0 transition-opacity group-hover/media:opacity-100">
+        <Maximize2 className="h-3.5 w-3.5" />
+      </span>
       {media.length > 1 && (
         <>
-          <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
+          <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
             {index + 1}/{media.length}
           </span>
           <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
@@ -49,11 +63,11 @@ function MediaCarousel({ media, alt }: { media: FeedMediaItem[]; alt: string }) 
           </div>
         </>
       )}
-    </div>
+    </button>
   );
 }
 
-export function PostCard({ post }: { post: FeedPost }) {
+export function PostCard({ post, onOpenViewer }: { post: FeedPost; onOpenViewer: () => void }) {
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [liked, setLiked] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -74,7 +88,7 @@ export function PostCard({ post }: { post: FeedPost }) {
   return (
     <div className="glass-panel group overflow-hidden">
       <div className="overflow-hidden">
-        <MediaCarousel media={post.media} alt={post.caption || "salon work"} />
+        <MediaCarousel media={post.media} alt={post.caption || "salon work"} onOpenViewer={onOpenViewer} />
       </div>
       <div className="flex flex-col gap-1 p-3">
         <div className="flex items-center justify-between">

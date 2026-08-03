@@ -6,6 +6,7 @@ import { generateInvoicePdf } from "@/services/pdf/invoiceGenerator";
 import { generateReceiptImage } from "@/services/image/receiptGenerator";
 import { storageProvider } from "@/services/storage";
 import { sendWhatsAppInvoice } from "@/services/whatsapp/whatsappService";
+import { createNotification } from "@/services/notifications/notificationService";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { createInvoiceSchema } from "./billing.schema";
 
@@ -32,15 +33,11 @@ export async function createInvoice(req: AuthRequest, res: Response) {
     issuedAt: new Date(),
   });
 
-  const invoiceUrl = await storageProvider.upload(
-    `invoices/${appointment.tenantId}/${appointment.id}.pdf`,
-    pdfBuffer,
-    "application/pdf"
-  );
+  await storageProvider.upload(`invoices/${appointment.tenantId}/${appointment.id}.pdf`, pdfBuffer, "application/pdf");
 
   const receiptBuffer = await generateReceiptImage({
     salonName: appointment.tenant.salonName,
-    logoUrl: appointment.tenant.logoUrl,
+    logoUrl: appointment.tenant.logoUrl ? await storageProvider.resolveUrl(appointment.tenant.logoUrl) : null,
     address: appointment.tenant.address,
     contactPhone: appointment.tenant.contactPhone,
     clientName: appointment.clientName,
@@ -50,11 +47,12 @@ export async function createInvoice(req: AuthRequest, res: Response) {
     issuedAt: new Date(),
   });
 
-  const receiptImageUrl = await storageProvider.upload(
-    `receipts/${appointment.tenantId}/${appointment.id}.png`,
-    receiptBuffer,
-    "image/png"
-  );
+  await storageProvider.upload(`receipts/${appointment.tenantId}/${appointment.id}.png`, receiptBuffer, "image/png");
+
+  const [signedInvoiceUrl, signedReceiptUrl] = await Promise.all([
+    storageProvider.getSignedUrl(`invoices/${appointment.tenantId}/${appointment.id}.pdf`),
+    storageProvider.getSignedUrl(`receipts/${appointment.tenantId}/${appointment.id}.png`),
+  ]);
 
   const [, ledgerEntry] = await prisma.$transaction([
     prisma.appointment.update({
@@ -80,15 +78,36 @@ export async function createInvoice(req: AuthRequest, res: Response) {
       clientName: appointment.clientName,
       salonName: appointment.tenant.salonName,
       totalAmount: totalAmount.toFixed(2),
-      pdfInvoiceUrl: invoiceUrl,
-      receiptImageUrl,
+      pdfInvoiceUrl: signedInvoiceUrl,
+      receiptImageUrl: signedReceiptUrl,
     });
   } catch (err) {
     // Invoice + ledger already committed; a WhatsApp delivery failure shouldn't fail billing.
     console.error("WhatsApp invoice dispatch failed:", err);
   }
 
-  return res.status(201).json({ success: true, invoiceUrl, receiptImageUrl, totalAmount, ledgerEntry });
+  if (appointment.clientId) {
+    try {
+      await createNotification({
+        clientId: appointment.clientId,
+        tenantId: appointment.tenantId,
+        appointmentId: appointment.id,
+        type: "INVOICE_READY",
+        title: "Your receipt is ready",
+        message: `Your receipt from ${appointment.tenant.salonName} for LKR ${totalAmount.toFixed(2)} is ready.`,
+      });
+    } catch (err) {
+      console.error("Notification create failed:", err);
+    }
+  }
+
+  return res.status(201).json({
+    success: true,
+    invoiceUrl: signedInvoiceUrl,
+    receiptImageUrl: signedReceiptUrl,
+    totalAmount,
+    ledgerEntry,
+  });
 }
 
 export async function listInvoices(req: AuthRequest, res: Response) {
@@ -121,20 +140,22 @@ export async function listInvoices(req: AuthRequest, res: Response) {
     prisma.ledger.count({ where }),
   ]);
 
-  const invoices = entries
-    .filter((e) => e.appointment)
-    .map((e) => ({
-      id: e.id,
-      appointmentId: e.appointmentId!,
-      clientName: e.appointment!.clientName,
-      clientPhone: e.appointment!.clientPhone,
-      services: e.appointment!.services.map((s) => s.service.name),
-      amount: e.amount,
-      paymentMode: e.paymentMode,
-      createdAt: e.createdAt,
-      invoiceUrl: storageProvider.getUrl(`invoices/${tenantId}/${e.appointmentId}.pdf`),
-      receiptImageUrl: storageProvider.getUrl(`receipts/${tenantId}/${e.appointmentId}.png`),
-    }));
+  const invoices = await Promise.all(
+    entries
+      .filter((e) => e.appointment)
+      .map(async (e) => ({
+        id: e.id,
+        appointmentId: e.appointmentId!,
+        clientName: e.appointment!.clientName,
+        clientPhone: e.appointment!.clientPhone,
+        services: e.appointment!.services.map((s) => s.service.name),
+        amount: e.amount,
+        paymentMode: e.paymentMode,
+        createdAt: e.createdAt,
+        invoiceUrl: await storageProvider.getSignedUrl(`invoices/${tenantId}/${e.appointmentId}.pdf`),
+        receiptImageUrl: await storageProvider.getSignedUrl(`receipts/${tenantId}/${e.appointmentId}.png`),
+      }))
+  );
 
   return res.json({ success: true, invoices, ...paginationMeta(total, page, pageSize) });
 }
