@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { List, CalendarDays, X } from "lucide-react";
 import { api } from "@/lib/api";
@@ -10,6 +11,7 @@ import { Pagination } from "@/components/shared/Pagination";
 import { useToast } from "@/components/ui/toast";
 import { AppointmentRow } from "@/components/appointments/AppointmentRow";
 import { BookingsCalendar } from "@/components/appointments/BookingsCalendar";
+import { BookingActionModal } from "@/components/appointments/BookingActionModal";
 import { Appointment, AppointmentStatus } from "@/types";
 
 interface AppointmentsResponse {
@@ -23,6 +25,7 @@ interface AppointmentsResponse {
 export default function AppointmentsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [view, setView] = useState<"list" | "calendar">("list");
   const [filter, setFilter] = useState<AppointmentStatus | "ALL">("ALL");
@@ -31,6 +34,17 @@ export default function AppointmentsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const openId = searchParams.get("open");
+    if (openId) {
+      setDetailsId(openId);
+      const next = new URLSearchParams(searchParams);
+      next.delete("open");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -180,7 +194,12 @@ export default function AppointmentsPage() {
               <div className="flex flex-col divide-y divide-plum-100 dark:divide-white/10">
                 {appointments.length ? (
                   appointments.map((appt) => (
-                    <AppointmentRow key={appt.id} appointment={appt} onUpdateStatus={handleUpdateStatus} />
+                    <AppointmentRow
+                      key={appt.id}
+                      appointment={appt}
+                      onUpdateStatus={handleUpdateStatus}
+                      onOpenDetails={setDetailsId}
+                    />
                   ))
                 ) : (
                   <p className="py-6 text-center text-sm text-plum-300 dark:text-cream-100/40">
@@ -195,6 +214,10 @@ export default function AppointmentsPage() {
           )}
         </CardContent>
       </Card>
+
+      {detailsId && (
+        <BookingActionModal appointmentId={detailsId} open={!!detailsId} onOpenChange={(next) => !next && setDetailsId(null)} />
+      )}
     </div>
   );
 }

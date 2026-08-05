@@ -5,14 +5,25 @@ import { ClientAuthRequest } from "@/middlewares/requireClientAuth";
 import { HttpError } from "@/middlewares/errorHandler";
 import { emitToTenant } from "@/realtime/socket";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
+import { isPubliclyVisible } from "@/utils/publicTenant";
 import { sendWhatsAppText } from "@/services/whatsapp/whatsappService";
 import { createNotification } from "@/services/notifications/notificationService";
+import { createOwnerNotification } from "@/services/notifications/ownerNotificationService";
 import { storageProvider } from "@/services/storage";
-import { createAppointmentSchema, updateStatusSchema } from "./appointment.schema";
+import {
+  createAppointmentSchema,
+  updateStatusSchema,
+  proposeRescheduleSchema,
+  respondToRescheduleSchema,
+  submitReviewSchema,
+  createWalkInAppointmentSchema,
+} from "./appointment.schema";
 
 const APPOINTMENT_INCLUDE = {
   services: { include: { service: true } },
   staff: true,
+  proposedStaff: true,
+  review: true,
 } as const;
 
 export async function listAppointments(req: AuthRequest, res: Response) {
@@ -66,10 +77,23 @@ export async function listAppointments(req: AuthRequest, res: Response) {
   return res.json({ success: true, appointments, ...paginationMeta(total, page, pageSize) });
 }
 
+export async function getAppointmentById(req: AuthRequest, res: Response) {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: req.params.id, tenantId: req.tenantId! },
+    include: APPOINTMENT_INCLUDE,
+  });
+  if (!appointment) throw new HttpError(404, "Appointment not found");
+  return res.json({ success: true, appointment });
+}
+
 export async function createPublicAppointment(req: ClientAuthRequest, res: Response) {
   const { slug } = req.params;
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
-  if (!tenant || !tenant.isActive) throw new HttpError(404, "Salon not found");
+  if (!tenant) throw new HttpError(404, "Salon not found");
+  // Covers a salon suspended or lapsed while a customer had the booking form open.
+  if (!isPubliclyVisible(tenant)) {
+    throw new HttpError(403, "This salon isn't accepting online bookings right now.");
+  }
 
   const data = createAppointmentSchema.parse(req.body);
   const { clientId, phone: clientPhone } = req.clientAuth!;
@@ -124,6 +148,56 @@ export async function createPublicAppointment(req: ClientAuthRequest, res: Respo
     }
   }
 
+  try {
+    await createOwnerNotification({
+      tenantId: tenant.id,
+      appointmentId: appointment.id,
+      type: "BOOKING_REQUESTED",
+      title: "New booking request",
+      message: `${appointment.clientName} requested ${serviceNames} on ${appointment.bookingTime.toLocaleString()}`,
+    });
+  } catch (err) {
+    console.error("Owner notification create failed:", err);
+  }
+
+  return res.status(201).json({ success: true, appointment });
+}
+
+// In-salon walk-in sale: no client account required. Lands as COMPLETED + unbilled
+// so it appears directly in the existing POS "unbilled" list, ready to invoice.
+export async function createWalkInAppointment(req: AuthRequest, res: Response) {
+  const data = createWalkInAppointmentSchema.parse(req.body);
+  const tenantId = req.tenantId!;
+
+  const services = await prisma.service.findMany({
+    where: { id: { in: data.serviceIds }, tenantId, isActive: true },
+  });
+  if (services.length !== data.serviceIds.length) {
+    throw new HttpError(400, "One or more selected services are invalid");
+  }
+
+  if (data.staffId) {
+    const staff = await prisma.staff.findFirst({ where: { id: data.staffId, tenantId } });
+    if (!staff) throw new HttpError(400, "Invalid staff member");
+  }
+
+  const appointment = await prisma.appointment.create({
+    data: {
+      tenantId,
+      staffId: data.staffId,
+      clientName: data.clientName?.trim() || "Walking Customer",
+      clientPhone: data.clientPhone?.trim() || "",
+      category: data.category,
+      bookingTime: new Date(),
+      status: "COMPLETED",
+      notes: data.notes,
+      services: {
+        create: services.map((s) => ({ serviceId: s.id, price: s.price })),
+      },
+    },
+    include: APPOINTMENT_INCLUDE,
+  });
+
   return res.status(201).json({ success: true, appointment });
 }
 
@@ -154,6 +228,22 @@ export async function listMyAppointments(req: ClientAuthRequest, res: Response) 
   );
 
   return res.json({ success: true, appointments: resolvedAppointments, ...paginationMeta(total, page, pageSize) });
+}
+
+export async function getMyAppointmentById(req: ClientAuthRequest, res: Response) {
+  const clientId = req.clientAuth!.clientId;
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: req.params.id, clientId },
+    include: {
+      ...APPOINTMENT_INCLUDE,
+      tenant: { select: { salonName: true, slug: true, logoUrl: true } },
+    },
+  });
+  if (!appointment) throw new HttpError(404, "Appointment not found");
+  if (appointment.tenant.logoUrl) {
+    appointment.tenant.logoUrl = await storageProvider.resolveUrl(appointment.tenant.logoUrl);
+  }
+  return res.json({ success: true, appointment });
 }
 
 export async function getAvailability(req: Request, res: Response) {
@@ -236,4 +326,189 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response) {
   }
 
   return res.json({ success: true, appointment });
+}
+
+export async function proposeReschedule(req: AuthRequest, res: Response) {
+  const { proposedBookingTime, proposedStaffId } = proposeRescheduleSchema.parse(req.body);
+
+  const existing = await prisma.appointment.findFirst({
+    where: { id: req.params.id, tenantId: req.tenantId! },
+  });
+  if (!existing) throw new HttpError(404, "Appointment not found");
+  if (existing.status !== "PENDING" && existing.status !== "CONFIRMED") {
+    throw new HttpError(400, "Only pending or confirmed appointments can be rescheduled");
+  }
+  if (existing.rescheduleStatus === "PROPOSED") {
+    throw new HttpError(400, "A reschedule proposal is already pending for this booking");
+  }
+
+  if (proposedStaffId) {
+    const staff = await prisma.staff.findFirst({ where: { id: proposedStaffId, tenantId: req.tenantId! } });
+    if (!staff) throw new HttpError(400, "Invalid staff member");
+  }
+
+  const appointment = await prisma.appointment.update({
+    where: { id: existing.id },
+    data: {
+      rescheduleStatus: "PROPOSED",
+      ...(proposedBookingTime ? { proposedBookingTime } : {}),
+      ...(proposedStaffId ? { proposedStaffId } : {}),
+    },
+    include: APPOINTMENT_INCLUDE,
+  });
+
+  if (appointment.clientId) {
+    const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId! }, select: { salonName: true } });
+    const newTime = proposedBookingTime ? proposedBookingTime.toLocaleString() : appointment.bookingTime.toLocaleString();
+    const withStaff = appointment.proposedStaff ? ` with ${appointment.proposedStaff.name}` : "";
+    try {
+      await createNotification({
+        clientId: appointment.clientId,
+        tenantId: req.tenantId!,
+        appointmentId: appointment.id,
+        type: "RESCHEDULE_PROPOSED",
+        title: "Salon proposed a new time",
+        message: `${tenant?.salonName} proposed ${newTime}${withStaff} for your appointment. Please accept or decline.`,
+      });
+    } catch (err) {
+      console.error("Notification create failed:", err);
+    }
+  }
+
+  return res.json({ success: true, appointment });
+}
+
+export async function respondToReschedule(req: ClientAuthRequest, res: Response) {
+  const { accept } = respondToRescheduleSchema.parse(req.body);
+  const clientId = req.clientAuth!.clientId;
+
+  const existing = await prisma.appointment.findFirst({ where: { id: req.params.id, clientId } });
+  if (!existing) throw new HttpError(404, "Appointment not found");
+  if (existing.rescheduleStatus !== "PROPOSED") {
+    throw new HttpError(400, "No pending reschedule proposal for this appointment");
+  }
+
+  const appointment = await prisma.appointment.update({
+    where: { id: existing.id },
+    data: accept
+      ? {
+          bookingTime: existing.proposedBookingTime ?? existing.bookingTime,
+          staffId: existing.proposedStaffId ?? existing.staffId,
+          proposedBookingTime: null,
+          proposedStaffId: null,
+          rescheduleStatus: "NONE",
+        }
+      : {
+          proposedBookingTime: null,
+          proposedStaffId: null,
+          rescheduleStatus: "NONE",
+        },
+    include: APPOINTMENT_INCLUDE,
+  });
+
+  emitToTenant(existing.tenantId, "appointment:updated", appointment);
+
+  try {
+    await createOwnerNotification({
+      tenantId: existing.tenantId,
+      appointmentId: appointment.id,
+      type: accept ? "RESCHEDULE_ACCEPTED" : "RESCHEDULE_DECLINED",
+      title: accept ? "Reschedule accepted" : "Reschedule declined",
+      message: accept
+        ? `${appointment.clientName} accepted the new time: ${appointment.bookingTime.toLocaleString()}.`
+        : `${appointment.clientName} declined the proposed reschedule.`,
+    });
+  } catch (err) {
+    console.error("Owner notification create failed:", err);
+  }
+
+  return res.json({ success: true, appointment });
+}
+
+export async function listPendingReviewAppointments(req: ClientAuthRequest, res: Response) {
+  const clientId = req.clientAuth!.clientId;
+  const appointments = await prisma.appointment.findMany({
+    where: { clientId, status: "COMPLETED", isBilled: true, review: null },
+    include: {
+      ...APPOINTMENT_INCLUDE,
+      tenant: { select: { salonName: true, slug: true, logoUrl: true } },
+    },
+    orderBy: { bookingTime: "desc" },
+    take: 10,
+  });
+
+  const resolvedAppointments = await Promise.all(
+    appointments.map(async (a) => ({
+      ...a,
+      tenant: { ...a.tenant, logoUrl: a.tenant.logoUrl ? await storageProvider.resolveUrl(a.tenant.logoUrl) : a.tenant.logoUrl },
+    }))
+  );
+
+  return res.json({ success: true, appointments: resolvedAppointments });
+}
+
+export async function submitAppointmentReview(req: ClientAuthRequest, res: Response) {
+  const { rating, comment } = submitReviewSchema.parse(req.body);
+  const clientId = req.clientAuth!.clientId;
+
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: req.params.id, clientId, status: "COMPLETED", isBilled: true },
+  });
+  if (!appointment) {
+    throw new HttpError(400, "Only clients with a completed and billed appointment can leave reviews.");
+  }
+
+  const existingReview = await prisma.review.findUnique({ where: { appointmentId: appointment.id } });
+  if (existingReview) throw new HttpError(400, "Review already submitted for this visit.");
+
+  const tenant = await prisma.tenant.findUnique({ where: { id: appointment.tenantId }, select: { salonName: true } });
+
+  const review = await prisma.review.create({
+    data: {
+      tenantId: appointment.tenantId,
+      appointmentId: appointment.id,
+      clientName: appointment.clientName,
+      rating,
+      comment,
+      isVerified: true,
+    },
+  });
+
+  try {
+    await sendWhatsAppText(
+      appointment.clientPhone,
+      `Thank you ${appointment.clientName} for your ${rating}-star review of ${tenant?.salonName}! We appreciate your feedback.`
+    );
+  } catch (err) {
+    console.error("WhatsApp review-thanks dispatch failed:", err);
+  }
+
+  try {
+    await createNotification({
+      clientId,
+      tenantId: appointment.tenantId,
+      appointmentId: appointment.id,
+      type: "REVIEW_THANKS",
+      title: "Thanks for your review",
+      message: `Thank you for your ${rating}-star review of ${tenant?.salonName}! We appreciate your feedback.`,
+    });
+  } catch (err) {
+    console.error("Notification create failed:", err);
+  }
+
+  try {
+    await createOwnerNotification({
+      tenantId: appointment.tenantId,
+      appointmentId: appointment.id,
+      type: "REVIEW_SUBMITTED",
+      title: "New review",
+      message: `${appointment.clientName} left a ${rating}-star review${comment ? `: "${comment}"` : "."}`,
+    });
+  } catch (err) {
+    console.error("Owner notification create failed:", err);
+  }
+
+  emitToTenant(appointment.tenantId, "review:created", { appointmentId: appointment.id, rating });
+
+  return res.status(201).json({ success: true, review });
 }

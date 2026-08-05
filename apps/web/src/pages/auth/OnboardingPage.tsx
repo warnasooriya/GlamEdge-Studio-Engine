@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sparkles, Scissors, Baby, ShieldCheck } from "lucide-react";
+import { Sparkles, Scissors, Baby, ShieldCheck, Clock3, AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAppDispatch } from "@/hooks/redux";
 import { setAuth } from "@/store/authSlice";
@@ -8,8 +8,9 @@ import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GlamEdgeLogo } from "@/components/shared/GlamEdgeLogo";
 
-type Step = "phone" | "otp";
+type Step = "phone" | "otp" | "pending" | "blocked";
 
 export default function OnboardingPage() {
   const [step, setStep] = useState<Step>("phone");
@@ -19,6 +20,7 @@ export default function OnboardingPage() {
   const [ownerName, setOwnerName] = useState("");
   const [needsRegistration, setNeedsRegistration] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [blockedMessage, setBlockedMessage] = useState("");
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -46,20 +48,36 @@ export default function OnboardingPage() {
         code,
         ...(needsRegistration ? { salonName, ownerName } : {}),
       });
+      if (res.data.pendingApproval) {
+        setStep("pending");
+        return;
+      }
       dispatch(setAuth({ token: res.data.token, tenant: res.data.tenant }));
       toast(`Welcome, ${res.data.tenant.salonName}!`, "success");
       navigate("/dashboard");
     } catch (err: any) {
+      const status = err.response?.status;
       const message = err.response?.data?.error || "Verification failed";
       if (message.includes("salonName")) {
         setNeedsRegistration(true);
         toast("New salon detected — tell us a bit about it", "default");
+      } else if (status === 403) {
+        setBlockedMessage(message);
+        setStep("blocked");
       } else {
         toast(message, "error");
       }
     } finally {
       setLoading(false);
     }
+  }
+
+  function resetToPhone() {
+    setStep("phone");
+    setPhone("");
+    setCode("");
+    setNeedsRegistration(false);
+    setBlockedMessage("");
   }
 
   return (
@@ -74,7 +92,7 @@ export default function OnboardingPage() {
         <div className="hidden flex-col gap-6 text-cream-50 md:flex">
           <div className="flex items-center gap-2">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-brand shadow-glow">
-              <Sparkles className="h-6 w-6 text-white" />
+              <GlamEdgeLogo className="h-6 w-6 text-white" />
             </div>
             <span className="font-display text-2xl font-semibold">GlamEdge</span>
           </div>
@@ -104,14 +122,49 @@ export default function OnboardingPage() {
         <Card className="w-full border-white/40 bg-white/90 shadow-2xl backdrop-blur-xl dark:bg-plum-800/90">
           <CardHeader className="items-center text-center">
             <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-brand shadow-glow md:hidden">
-              <Sparkles className="h-6 w-6 text-white" />
+              <GlamEdgeLogo className="h-6 w-6 text-white" />
             </div>
             <CardTitle className="text-xl">GlamEdge Studio Engine</CardTitle>
-            <p className="text-sm text-plum-400 dark:text-cream-100/60">
-              {step === "phone" ? "Enter your mobile number to continue" : "Enter the OTP we sent you"}
-            </p>
+            {(step === "phone" || step === "otp") && (
+              <p className="text-sm text-plum-400 dark:text-cream-100/60">
+                {step === "phone" ? "Enter your mobile number to continue" : "Enter the OTP we sent you"}
+              </p>
+            )}
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
+            {step === "pending" && (
+              <div className="flex flex-col items-center gap-3 py-2 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/10">
+                  <Clock3 className="h-7 w-7 text-amber-500" />
+                </div>
+                <h3 className="font-display text-lg font-semibold text-plum-800 dark:text-cream-50">
+                  Thanks for registering!
+                </h3>
+                <p className="text-sm text-plum-500 dark:text-cream-100/70">
+                  Your salon is pending admin approval. We'll notify you as soon as it's reviewed — usually within
+                  one business day.
+                </p>
+                <Button variant="ghost" size="sm" onClick={resetToPhone}>
+                  Back to sign in
+                </Button>
+              </div>
+            )}
+
+            {step === "blocked" && (
+              <div className="flex flex-col items-center gap-3 py-2 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10">
+                  <AlertTriangle className="h-7 w-7 text-red-500" />
+                </div>
+                <h3 className="font-display text-lg font-semibold text-plum-800 dark:text-cream-50">
+                  Access unavailable
+                </h3>
+                <p className="text-sm text-plum-500 dark:text-cream-100/70">{blockedMessage}</p>
+                <Button variant="ghost" size="sm" onClick={resetToPhone}>
+                  Back to sign in
+                </Button>
+              </div>
+            )}
+
             {step === "phone" && (
               <>
                 <Input
@@ -156,9 +209,11 @@ export default function OnboardingPage() {
               </>
             )}
 
-            <p className="mt-1 flex items-center justify-center gap-1.5 text-xs text-plum-300 dark:text-cream-100/40">
-              <ShieldCheck className="h-3.5 w-3.5" /> Secured by OTP — no passwords, ever.
-            </p>
+            {(step === "phone" || step === "otp") && (
+              <p className="mt-1 flex items-center justify-center gap-1.5 text-xs text-plum-300 dark:text-cream-100/40">
+                <ShieldCheck className="h-3.5 w-3.5" /> Secured by OTP — no passwords, ever.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

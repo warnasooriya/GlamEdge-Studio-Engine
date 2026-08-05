@@ -1,0 +1,61 @@
+# syntax=docker/dockerfile:1
+#
+# API image. Built from the repo root so the pnpm workspace (lockfile + both
+# package manifests) is available — see the `context: .` in docker-compose.yml.
+#
+# Debian rather than Alpine on purpose: both sharp and Prisma's query engine ship
+# prebuilt glibc binaries, so this avoids musl-specific build steps.
+
+FROM node:20-bookworm-slim AS base
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
+# openssl is required by Prisma's query engine at runtime.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN corepack enable
+WORKDIR /app
+
+# --- dependencies ------------------------------------------------------------
+# Only the manifests are copied first so this layer caches until a dependency
+# actually changes.
+FROM base AS deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter api...
+
+# --- build -------------------------------------------------------------------
+FROM deps AS build
+COPY apps/api apps/api
+# Generate the Prisma client for this platform, then compile TS -> dist.
+# The build script also runs tsc-alias, which rewrites the "@/*" path aliases
+# into relative requires so plain `node dist/index.js` can resolve them.
+RUN pnpm --filter api exec prisma generate
+RUN pnpm --filter api build
+
+# --- runtime -----------------------------------------------------------------
+FROM base AS runtime
+ENV NODE_ENV=production
+
+# node_modules carries the generated Prisma client and the Prisma CLI, which the
+# entrypoint needs for `migrate deploy`.
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/prisma ./apps/api/prisma
+COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/api/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+WORKDIR /app/apps/api
+
+# Uploads live here when no S3 bucket is configured; docker-compose mounts a
+# named volume over it so media survives container replacement.
+RUN mkdir -p uploads && chown -R node:node uploads
+USER node
+
+EXPOSE 4000
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["node", "dist/index.js"]

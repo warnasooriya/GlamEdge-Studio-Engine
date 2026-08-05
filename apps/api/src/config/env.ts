@@ -18,6 +18,11 @@ export const env = {
   port: Number(optional("PORT", "4000")),
   corsOrigin: optional("CORS_ORIGIN", "http://localhost:5173"),
 
+  // Base URL that locally-stored uploads are served from. Behind a reverse proxy
+  // set this to the public origin (https://your-domain), or to an empty string to
+  // emit same-origin relative URLs. Defaults to the dev API origin.
+  publicUrl: optional("PUBLIC_URL", `http://localhost:${optional("PORT", "4000")}`).replace(/\/+$/, ""),
+
   databaseUrl: optional("DATABASE_URL"),
   mongodbUri: optional("MONGODB_URI", "mongodb://localhost:27017/glamedge_feed"),
   redisUrl: optional("REDIS_URL", "redis://localhost:6379"),
@@ -43,6 +48,11 @@ export const env = {
   whatsapp: {
     token: optional("WHATSAPP_CLOUD_API_TOKEN"),
     phoneNumberId: optional("WHATSAPP_PHONE_NUMBER_ID"),
+  },
+
+  adminBootstrap: {
+    email: optional("ADMIN_EMAIL", "admin@glamedge.dev"),
+    password: optional("ADMIN_PASSWORD", ""),
   },
 };
 

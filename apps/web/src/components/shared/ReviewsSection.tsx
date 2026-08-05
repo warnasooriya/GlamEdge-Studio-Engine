@@ -1,11 +1,8 @@
-import { useState } from "react";
-import { useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Star } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/toast";
 import { Review } from "@/types";
 
 interface ReviewsPage {
@@ -17,9 +14,6 @@ interface ReviewsPage {
 }
 
 export function ReviewsSection({ slug }: { slug: string }) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["reviews", slug],
     queryFn: async ({ pageParam }: { pageParam: number }) =>
@@ -30,22 +24,6 @@ export function ReviewsSection({ slug }: { slug: string }) {
 
   const reviews = data?.pages.flatMap((p) => p.reviews) || [];
   const summary = data?.pages[0];
-
-  const [appointmentId, setAppointmentId] = useState("");
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
-
-  const submitReview = useMutation({
-    mutationFn: async () =>
-      api.post(`/api/reviews/public/${slug}`, { appointmentId, rating, comment: comment || undefined }),
-    onSuccess: () => {
-      toast("Thanks for your verified review!", "success");
-      setAppointmentId("");
-      setComment("");
-      queryClient.invalidateQueries({ queryKey: ["reviews", slug] });
-    },
-    onError: (err: any) => toast(err.response?.data?.error || "Could not submit review", "error"),
-  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -60,32 +38,16 @@ export function ReviewsSection({ slug }: { slug: string }) {
         </p>
       </div>
 
-      <div className="glass-panel flex flex-col gap-2 p-5">
+      <div className="glass-panel flex flex-col gap-1.5 p-5">
         <p className="section-heading text-base">Leave a verified review</p>
         <p className="text-xs text-plum-400 dark:text-cream-100/50">
-          Only clients with a completed & billed appointment can review. Use the booking reference from
-          your confirmation or invoice.
+          Only clients with a completed & billed appointment can review. We'll prompt you to rate your visit
+          right in{" "}
+          <Link to="/account" className="font-medium text-brand-500 hover:underline">
+            My Account
+          </Link>{" "}
+          after the salon marks it complete.
         </p>
-        <Input
-          placeholder="Booking reference (appointment ID)"
-          value={appointmentId}
-          onChange={(e) => setAppointmentId(e.target.value)}
-        />
-        <div className="flex gap-1">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button key={n} onClick={() => setRating(n)}>
-              <Star className={`h-6 w-6 transition-colors ${n <= rating ? "fill-amber-400 text-amber-400" : "text-plum-100 dark:text-white/15"}`} />
-            </button>
-          ))}
-        </div>
-        <Textarea placeholder="How was your visit?" value={comment} onChange={(e) => setComment(e.target.value)} />
-        <Button
-          disabled={!appointmentId || submitReview.isPending}
-          onClick={() => submitReview.mutate()}
-          className="self-start"
-        >
-          Submit Review
-        </Button>
       </div>
 
       <div className="flex flex-col gap-2">

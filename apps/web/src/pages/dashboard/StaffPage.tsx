@@ -49,7 +49,11 @@ export default function StaffPage() {
 
   const deleteStaff = useMutation({
     mutationFn: async (id: string) => api.delete(`/api/staff/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["staff"] }),
+    onSuccess: () => {
+      toast("Staff member removed", "success");
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+    },
+    onError: (err: any) => toast(err.response?.data?.error || "Failed to remove staff", "error"),
   });
 
   return (

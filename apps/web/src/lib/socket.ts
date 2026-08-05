@@ -2,10 +2,10 @@ import { io, Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
 
-export function connectSocket(tenantId: string): Socket {
+export function connectSocket(identity: { tenantId?: string; clientId?: string }): Socket {
   if (socket) socket.disconnect();
   socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:4000", {
-    query: { tenantId },
+    query: identity,
   });
   return socket;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { CheckCircle2, Clock, UserCircle } from "lucide-react";
 import { clientApi } from "@/lib/clientApi";
@@ -22,11 +22,20 @@ interface Props {
 const SELECT_CLASS =
   "h-10 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50 disabled:opacity-50";
 
+const ALL_CATEGORIES = ["LADIES", "GENTS", "KIDS"] as const;
+
+function availableCategories(services: Service[]): CategoryType[] {
+  const present = new Set(services.map((s) => s.category));
+  return ALL_CATEGORIES.filter((c) => present.has(c));
+}
+
 export function BookingForm({ slug, services, staff }: Props) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const client = useAppSelector((s) => s.clientAuth.client)!;
-  const [category, setCategory] = useState<CategoryType>("LADIES");
+  const categories = useMemo(() => availableCategories(services), [services]);
+  const [category, setCategory] = useState<CategoryType>(() => availableCategories(services)[0] || "LADIES");
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [staffId, setStaffId] = useState("");
   const [date, setDate] = useState("");
@@ -66,6 +75,12 @@ export function BookingForm({ slug, services, staff }: Props) {
     setSelectedServiceIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  useEffect(() => {
+    if (!confirmedId) return;
+    const timer = setTimeout(() => navigate("/account"), 5000);
+    return () => clearTimeout(timer);
+  }, [confirmedId, navigate]);
+
   if (confirmedId) {
     return (
       <div className="glass-panel flex flex-col items-center gap-2 p-8 text-center">
@@ -73,12 +88,10 @@ export function BookingForm({ slug, services, staff }: Props) {
           <CheckCircle2 className="h-8 w-8" />
         </div>
         <p className="font-display text-xl font-semibold text-plum-800 dark:text-cream-50">Booking request sent!</p>
-        <p className="text-sm text-plum-400 dark:text-cream-100/60">
-          Reference: <span className="font-mono text-brand-600 dark:text-brand-300">{confirmedId}</span>
+        <p className="max-w-xs text-sm text-plum-400 dark:text-cream-100/60">
+          The salon will confirm your appointment shortly — we'll notify you the moment they do.
         </p>
-        <p className="mt-1 max-w-xs text-xs text-plum-300 dark:text-cream-100/40">
-          Keep this reference — you'll need it to leave a verified review after your visit.
-        </p>
+        <p className="mt-1 text-xs text-plum-300 dark:text-cream-100/40">Taking you to My Account...</p>
       </div>
     );
   }
@@ -100,7 +113,7 @@ export function BookingForm({ slug, services, staff }: Props) {
       </div>
 
       <div className="flex gap-2">
-        {(["LADIES", "GENTS", "KIDS"] as const).map((c) => (
+        {categories.map((c) => (
           <button
             key={c}
             onClick={() => setCategory(c)}

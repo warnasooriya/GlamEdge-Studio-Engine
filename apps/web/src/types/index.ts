@@ -1,7 +1,10 @@
 export type CategoryType = "LADIES" | "GENTS" | "KIDS";
 export type AppointmentStatus = "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+export type RescheduleStatus = "NONE" | "PROPOSED";
 export type PaymentMode = "CASH" | "CARD" | "ONLINE" | "LANKAQR";
 export type LedgerType = "INCOME" | "EXPENSE";
+export type TenantStatus = "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
+export type SubscriptionCycle = "MONTHLY" | "YEARLY";
 
 export interface Tenant {
   id: string;
@@ -17,6 +20,37 @@ export interface Tenant {
   latitude?: number | null;
   longitude?: number | null;
   contactPhone?: string | null;
+  status: TenantStatus;
+  rejectionReason?: string | null;
+  approvedAt?: string | null;
+  subscriptionCycle: SubscriptionCycle;
+  subscriptionFee: string;
+  subscriptionStartedAt?: string | null;
+  subscriptionExpiresAt?: string | null;
+  expiryNotifiedAt?: string | null;
+}
+
+export interface Admin {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface SubscriptionPayment {
+  id: string;
+  tenantId: string;
+  amount: string;
+  tier: "STARTER" | "PRO" | "ENTERPRISE";
+  cycle: SubscriptionCycle;
+  paymentMode: PaymentMode;
+  reference?: string | null;
+  notes?: string | null;
+  periodStart: string;
+  periodEnd: string;
+  paidAt: string;
+  createdAt: string;
+  recordedBy?: { id: string; name: string } | null;
+  tenant?: { id: string; salonName: string; phone: string; ownerName: string };
 }
 
 export interface Client {
@@ -50,6 +84,7 @@ export interface Appointment {
   tenantId: string;
   staffId?: string | null;
   staff?: Staff | null;
+  clientId?: string | null;
   clientName: string;
   clientPhone: string;
   category: CategoryType;
@@ -57,7 +92,11 @@ export interface Appointment {
   status: AppointmentStatus;
   isBilled: boolean;
   notes?: string | null;
+  rescheduleStatus: RescheduleStatus;
+  proposedBookingTime?: string | null;
+  proposedStaff?: Staff | null;
   services: { serviceId: string; price: string; service: Service }[];
+  review?: Review | null;
 }
 
 export interface LedgerEntry {
@@ -124,7 +163,14 @@ export type NotificationType =
   | "BOOKING_CONFIRMED"
   | "BOOKING_CANCELLED"
   | "REVIEW_THANKS"
-  | "INVOICE_READY";
+  | "INVOICE_READY"
+  | "RESCHEDULE_PROPOSED"
+  | "RESCHEDULE_ACCEPTED"
+  | "RESCHEDULE_DECLINED"
+  | "NEW_MESSAGE"
+  | "REVIEW_SUBMITTED"
+  | "SUBSCRIPTION_EXPIRING"
+  | "SUBSCRIPTION_EXPIRED";
 
 export interface AppNotification {
   id: string;
@@ -137,6 +183,35 @@ export interface AppNotification {
   isRead: boolean;
   createdAt: string;
   tenant: { salonName: string; slug: string; logoUrl?: string | null };
+}
+
+export interface OwnerNotification {
+  id: string;
+  tenantId: string;
+  appointmentId?: string | null;
+  type: NotificationType;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface MessageAttachment {
+  url: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+export interface AppointmentMessage {
+  _id: string;
+  appointmentId: string;
+  tenantId: string;
+  senderType: "OWNER" | "CLIENT";
+  senderName: string;
+  text?: string;
+  attachment?: MessageAttachment;
+  createdAt: string;
 }
 
 export interface ClientAppointment extends Appointment {

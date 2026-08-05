@@ -21,6 +21,18 @@ enum SubscriptionTier {
   ENTERPRISE
 }
 
+enum SubscriptionCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum TenantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
 enum LedgerType {
   INCOME
   EXPENSE
@@ -46,31 +58,53 @@ enum NotificationType {
   BOOKING_CANCELLED
   REVIEW_THANKS
   INVOICE_READY
+  RESCHEDULE_PROPOSED
+  RESCHEDULE_ACCEPTED
+  RESCHEDULE_DECLINED
+  NEW_MESSAGE
+  REVIEW_SUBMITTED
+  SUBSCRIPTION_EXPIRING
+  SUBSCRIPTION_EXPIRED
+}
+
+enum RescheduleStatus {
+  NONE
+  PROPOSED
 }
 
 model Tenant {
-  id           String           @id @default(uuid())
-  salonName    String           @db.VarChar(191)
-  slug         String           @unique @db.VarChar(191)
-  phone        String           @unique @db.VarChar(50)
-  ownerName    String           @db.VarChar(191)
-  subscription SubscriptionTier @default(STARTER)
-  isActive     Boolean          @default(true)
-  logoUrl      String?          @db.VarChar(500)
-  address      String?          @db.Text
-  mapLink      String?          @db.VarChar(500)
-  latitude     Float?
-  longitude    Float?
-  contactPhone String?          @db.VarChar(50)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id                    String             @id @default(uuid())
+  salonName             String             @db.VarChar(191)
+  slug                  String             @unique @db.VarChar(191)
+  phone                 String             @unique @db.VarChar(50)
+  ownerName             String             @db.VarChar(191)
+  subscription          SubscriptionTier   @default(STARTER)
+  isActive              Boolean            @default(true)
+  status                TenantStatus       @default(PENDING)
+  rejectionReason       String?            @db.VarChar(500)
+  approvedAt            DateTime?
+  subscriptionCycle     SubscriptionCycle  @default(MONTHLY)
+  subscriptionFee       Decimal            @default(0.00) @db.Decimal(10, 2)
+  subscriptionStartedAt DateTime?
+  subscriptionExpiresAt DateTime?
+  expiryNotifiedAt      DateTime?
+  logoUrl               String?            @db.VarChar(500)
+  address               String?            @db.Text
+  mapLink               String?            @db.VarChar(500)
+  latitude              Float?
+  longitude             Float?
+  contactPhone          String?            @db.VarChar(50)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
-  services      Service[]
-  staff         Staff[]
-  appointments  Appointment[]
-  ledgers       Ledger[]
-  reviews       Review[]
-  notifications Notification[]
+  services             Service[]
+  staff                Staff[]
+  appointments         Appointment[]
+  ledgers              Ledger[]
+  reviews              Review[]
+  notifications        Notification[]
+  ownerNotifications   OwnerNotification[]
+  subscriptionPayments SubscriptionPayment[]
 
   @@map("tenants")
 }
@@ -93,39 +127,44 @@ model Service {
 }
 
 model Staff {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name        String   @db.VarChar(191)
-  phone       String?  @db.VarChar(50)
-  role        String   @default("Stylist") @db.VarChar(100)
-  commission  Decimal  @default(0.00) @db.Decimal(5, 2)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String   @db.VarChar(191)
+  phone      String?  @db.VarChar(50)
+  role       String   @default("Stylist") @db.VarChar(100)
+  commission Decimal  @default(0.00) @db.Decimal(5, 2)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
-  appointments Appointment[]
+  appointments            Appointment[]
+  proposedForAppointments Appointment[] @relation("ProposedStaff")
 
   @@index([tenantId])
   @@map("staff")
 }
 
 model Appointment {
-  id          String            @id @default(uuid())
-  tenantId    String
-  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  staffId     String?
-  staff       Staff?            @relation(fields: [staffId], references: [id], onDelete: SetNull)
-  clientId    String?
-  client      Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  clientName  String            @db.VarChar(191)
-  clientPhone String            @db.VarChar(50)
-  category    CategoryType
-  bookingTime DateTime
-  status      AppointmentStatus @default(PENDING)
-  isBilled    Boolean           @default(false)
-  notes       String?           @db.Text
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id                  String            @id @default(uuid())
+  tenantId            String
+  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staffId             String?
+  staff               Staff?            @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  clientId            String?
+  client              Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientName          String            @db.VarChar(191)
+  clientPhone         String            @db.VarChar(50)
+  category            CategoryType
+  bookingTime         DateTime
+  status              AppointmentStatus @default(PENDING)
+  isBilled            Boolean           @default(false)
+  notes               String?           @db.Text
+  proposedBookingTime DateTime?
+  proposedStaffId     String?
+  proposedStaff       Staff?            @relation("ProposedStaff", fields: [proposedStaffId], references: [id], onDelete: SetNull)
+  rescheduleStatus    RescheduleStatus  @default(NONE)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   services AppointmentService[]
   ledger   Ledger?
@@ -165,6 +204,21 @@ model Notification {
 
   @@index([clientId])
   @@map("notifications")
+}
+
+model OwnerNotification {
+  id            String           @id @default(uuid())
+  tenantId      String
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointmentId String?
+  type          NotificationType
+  title         String           @db.VarChar(191)
+  message       String           @db.Text
+  isRead        Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+
+  @@index([tenantId])
+  @@map("owner_notifications")
 }
 
 model AppointmentService {
@@ -210,4 +264,42 @@ model Review {
 
   @@index([tenantId])
   @@map("reviews")
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  email        String   @unique @db.VarChar(191)
+  passwordHash String   @db.VarChar(255)
+  name         String   @db.VarChar(191)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  recordedPayments SubscriptionPayment[]
+
+  @@map("admins")
+}
+
+// One row per subscription fee collected from a salon. Immutable ledger: renewing
+// a subscription records a payment covering periodStart..periodEnd, so the admin
+// can always reconstruct what a salon paid and for which window.
+model SubscriptionPayment {
+  id           String            @id @default(uuid())
+  tenantId     String
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  amount       Decimal           @db.Decimal(10, 2)
+  tier         SubscriptionTier
+  cycle        SubscriptionCycle
+  paymentMode  PaymentMode       @default(CASH)
+  reference    String?           @db.VarChar(191)
+  notes        String?           @db.VarChar(500)
+  periodStart  DateTime
+  periodEnd    DateTime
+  paidAt       DateTime          @default(now())
+  recordedById String?
+  recordedBy   Admin?            @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime          @default(now())
+
+  @@index([tenantId])
+  @@index([paidAt])
+  @@map("subscription_payments")
 }

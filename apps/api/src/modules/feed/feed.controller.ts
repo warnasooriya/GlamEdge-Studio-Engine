@@ -5,8 +5,10 @@ import { Post } from "@/models/Post";
 import { Comment } from "@/models/Comment";
 import { Like } from "@/models/Like";
 import { AuthRequest } from "@/middlewares/requireAuth";
+import { ClientAuthRequest } from "@/middlewares/requireClientAuth";
 import { HttpError } from "@/middlewares/errorHandler";
 import { storageProvider } from "@/services/storage";
+import { prisma } from "@/config/prisma";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { createPostSchema, likeSchema, commentSchema } from "./feed.schema";
 
@@ -56,14 +58,18 @@ export async function createPost(req: AuthRequest, res: Response) {
 export async function listPublicFeed(req: Request, res: Response) {
   const { tenantId, category, cursor, limit = "12" } = req.query as Record<string, string>;
 
-  const query: Record<string, unknown> = {};
-  if (tenantId) query.tenantId = tenantId;
-  if (category) query.category = category;
-  if (cursor) query._id = { $lt: cursor };
+  const baseQuery: Record<string, unknown> = {};
+  if (tenantId) baseQuery.tenantId = tenantId;
+  if (category) baseQuery.category = category;
 
-  const posts = await Post.find(query)
-    .sort({ _id: -1 })
-    .limit(Math.min(Number(limit) || 12, 50));
+  const query = cursor ? { ...baseQuery, _id: { $lt: cursor } } : baseQuery;
+
+  const [posts, total] = await Promise.all([
+    Post.find(query)
+      .sort({ _id: -1 })
+      .limit(Math.min(Number(limit) || 12, 50)),
+    Post.countDocuments(baseQuery),
+  ]);
 
   const nextCursor = posts.length ? posts[posts.length - 1]._id.toString() : null;
 
@@ -71,7 +77,7 @@ export async function listPublicFeed(req: Request, res: Response) {
     posts.map(async (p) => ({ ...p.toObject(), media: await resolveMediaUrls(p.media) }))
   );
 
-  return res.json({ success: true, posts: resolvedPosts, nextCursor });
+  return res.json({ success: true, posts: resolvedPosts, nextCursor, total });
 }
 
 export async function likePost(req: Request, res: Response) {
@@ -108,17 +114,22 @@ export async function unlikePost(req: Request, res: Response) {
   return res.json({ success: true, likeCount: post.likeCount });
 }
 
-export async function addComment(req: Request, res: Response) {
+export async function addComment(req: ClientAuthRequest, res: Response) {
   const data = commentSchema.parse(req.body);
   const { postId } = req.params;
+  const clientId = req.clientAuth!.clientId;
 
   const post = await Post.findById(postId);
   if (!post) throw new HttpError(404, "Post not found");
 
+  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { name: true } });
+  if (!client) throw new HttpError(404, "Client not found");
+
   const comment = await Comment.create({
     postId,
     tenantId: post.tenantId,
-    authorName: data.authorName,
+    clientId,
+    authorName: client.name,
     text: data.text,
   });
 

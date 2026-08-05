@@ -6,6 +6,7 @@ import { prisma } from "@/config/prisma";
 import { HttpError } from "@/middlewares/errorHandler";
 import { AuthRequest } from "@/middlewares/requireAuth";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
+import { publicTenantSql, isPubliclyVisible } from "@/utils/publicTenant";
 import { storageProvider } from "@/services/storage";
 import { Post } from "@/models/Post";
 
@@ -123,14 +124,14 @@ export async function listPublicTenants(req: Request, res: Response) {
     FROM tenants t
     LEFT JOIN (SELECT tenantId, AVG(rating) AS avgRating, COUNT(*) AS reviewCount FROM reviews GROUP BY tenantId) rv ON rv.tenantId = t.id
     LEFT JOIN (SELECT tenantId, MIN(price) AS minPrice FROM services WHERE isActive = 1 GROUP BY tenantId) sv ON sv.tenantId = t.id
-    WHERE t.isActive = 1 ${searchClause} ${locationClause} ${geoClause}
+    WHERE 1=1 ${publicTenantSql} ${searchClause} ${locationClause} ${geoClause}
     ORDER BY ${orderExpr}
     LIMIT ${take} OFFSET ${skip}
   `);
 
   const [{ count }] = await prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
     SELECT COUNT(*) AS count FROM tenants t
-    WHERE t.isActive = 1 ${searchClause} ${locationClause} ${geoClause}
+    WHERE 1=1 ${publicTenantSql} ${searchClause} ${locationClause} ${geoClause}
   `);
 
   const ids = rows.map((r) => r.id);
@@ -174,6 +175,8 @@ export async function getPublicTenantBySlug(req: Request, res: Response) {
       slug: true,
       subscription: true,
       isActive: true,
+      status: true,
+      subscriptionExpiresAt: true,
       logoUrl: true,
       address: true,
       mapLink: true,
@@ -184,9 +187,13 @@ export async function getPublicTenantBySlug(req: Request, res: Response) {
       staff: { where: { isActive: true }, select: { id: true, name: true, role: true } },
     },
   });
-  if (!tenant || !tenant.isActive) throw new HttpError(404, "Salon not found");
-  if (tenant.logoUrl) tenant.logoUrl = await storageProvider.resolveUrl(tenant.logoUrl);
-  return res.json({ success: true, tenant });
+  // Same 404 whether the salon is missing, unapproved, suspended, or lapsed —
+  // the public page must not reveal a salon's account state.
+  if (!tenant || !isPubliclyVisible(tenant)) throw new HttpError(404, "Salon not found");
+
+  const { status, subscriptionExpiresAt, ...publicTenant } = tenant;
+  if (publicTenant.logoUrl) publicTenant.logoUrl = await storageProvider.resolveUrl(publicTenant.logoUrl);
+  return res.json({ success: true, tenant: publicTenant });
 }
 
 export async function updateTenant(req: AuthRequest, res: Response) {

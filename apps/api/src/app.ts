@@ -17,6 +17,10 @@ import { feedRouter } from "@/modules/feed/feed.routes";
 import { reviewRouter } from "@/modules/reviews/review.routes";
 import { clientRouter } from "@/modules/clients/client.routes";
 import { notificationRouter } from "@/modules/notifications/notification.routes";
+import { ownerNotificationRouter } from "@/modules/notifications/ownerNotification.routes";
+import { analyticsRouter } from "@/modules/analytics/analytics.routes";
+import { reportsRouter } from "@/modules/reports/reports.routes";
+import { adminRouter } from "@/modules/admin/admin.routes";
 
 export const app = express();
 
@@ -40,5 +44,9 @@ app.use("/api/feed", feedRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/clients", clientRouter);
 app.use("/api/notifications", notificationRouter);
+app.use("/api/owner-notifications", ownerNotificationRouter);
+app.use("/api/analytics", analyticsRouter);
+app.use("/api/reports", reportsRouter);
+app.use("/api/admin", adminRouter);
 
 app.use(errorHandler);

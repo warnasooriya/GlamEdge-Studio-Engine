@@ -6,7 +6,7 @@ import { createStaffSchema, updateStaffSchema } from "./staff.schema";
 
 export async function listStaff(req: AuthRequest, res: Response) {
   const staff = await prisma.staff.findMany({
-    where: { tenantId: req.tenantId! },
+    where: { tenantId: req.tenantId!, isActive: true },
     orderBy: { createdAt: "asc" },
   });
   return res.json({ success: true, staff });

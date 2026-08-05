@@ -2,6 +2,7 @@ import { Response } from "express";
 import { prisma } from "@/config/prisma";
 import { AuthRequest } from "@/middlewares/requireAuth";
 import { HttpError } from "@/middlewares/errorHandler";
+import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { createServiceSchema, updateServiceSchema } from "./service.schema";
 
 export async function listServices(req: AuthRequest, res: Response) {
@@ -56,6 +57,17 @@ export const SERVICE_TEMPLATES = [
   { category: "KIDS", name: "First Haircut Ceremony", price: 3000, durationMin: 45 },
 ] as const;
 
-export async function listServiceTemplates(_req: AuthRequest, res: Response) {
-  return res.json({ success: true, templates: SERVICE_TEMPLATES });
+export async function listServiceTemplates(req: AuthRequest, res: Response) {
+  const { search, category } = req.query as { search?: string; category?: string };
+  const { page, pageSize, skip, take } = parsePagination(req.query, 8, 50);
+
+  const q = search?.trim().toLowerCase();
+  const filtered = SERVICE_TEMPLATES.filter((t) => {
+    if (category && category !== "ALL" && t.category !== category) return false;
+    if (q && !t.name.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const templates = filtered.slice(skip, skip + take);
+  return res.json({ success: true, templates, ...paginationMeta(filtered.length, page, pageSize) });
 }

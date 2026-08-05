@@ -72,18 +72,23 @@ export async function createInvoice(req: AuthRequest, res: Response) {
     }),
   ]);
 
-  try {
-    await sendWhatsAppInvoice({
-      clientPhone: appointment.clientPhone,
-      clientName: appointment.clientName,
-      salonName: appointment.tenant.salonName,
-      totalAmount: totalAmount.toFixed(2),
-      pdfInvoiceUrl: signedInvoiceUrl,
-      receiptImageUrl: signedReceiptUrl,
-    });
-  } catch (err) {
-    // Invoice + ledger already committed; a WhatsApp delivery failure shouldn't fail billing.
-    console.error("WhatsApp invoice dispatch failed:", err);
+  let whatsappSent = false;
+  if (appointment.clientPhone) {
+    try {
+      await sendWhatsAppInvoice({
+        clientPhone: appointment.clientPhone,
+        clientName: appointment.clientName,
+        salonName: appointment.tenant.salonName,
+        totalAmount: totalAmount.toFixed(2),
+        pdfInvoiceUrl: signedInvoiceUrl,
+        receiptImageUrl: signedReceiptUrl,
+      });
+      whatsappSent = true;
+    } catch (err) {
+      // Invoice + ledger already committed; a WhatsApp delivery failure shouldn't fail billing.
+      // The caller still needs to know it failed, though — never silently claim it was sent.
+      console.error("WhatsApp invoice dispatch failed:", err);
+    }
   }
 
   if (appointment.clientId) {
@@ -106,6 +111,8 @@ export async function createInvoice(req: AuthRequest, res: Response) {
     invoiceUrl: signedInvoiceUrl,
     receiptImageUrl: signedReceiptUrl,
     totalAmount,
+    whatsappSent,
+    hasPhone: Boolean(appointment.clientPhone),
     ledgerEntry,
   });
 }

@@ -16,6 +16,5 @@ export const likeSchema = z.object({
 });
 
 export const commentSchema = z.object({
-  authorName: z.string().min(1).max(191),
   text: z.string().min(1).max(500),
 });

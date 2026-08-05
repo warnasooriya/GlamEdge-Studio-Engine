@@ -1,8 +1,15 @@
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, CalendarClock, Bell, UserCircle, LogOut, Sparkles, Search } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { LayoutDashboard, CalendarClock, Bell, BellRing, UserCircle, LogOut, Sparkles, Search, X } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
 import { clientLogout } from "@/store/clientAuthSlice";
 import { ClientLoginGate } from "@/components/booking/ClientLoginGate";
+import { ReviewPromptModal } from "@/components/appointments/ReviewPromptModal";
+import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
+import { useToast } from "@/components/ui/toast";
+import { playNotificationSound } from "@/lib/notificationSound";
+import { AppNotification } from "@/types";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -12,10 +19,66 @@ const NAV_ITEMS = [
   { to: "/account/profile", label: "Profile", icon: UserCircle },
 ];
 
+const PERMISSION_BANNER_DISMISSED_KEY = "glamedge_client_notif_banner_dismissed";
+
 export default function ClientLayout() {
   const client = useAppSelector((s) => s.clientAuth.client);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const [showPermissionBanner, setShowPermissionBanner] = useState(
+    () =>
+      typeof Notification !== "undefined" &&
+      Notification.permission === "default" &&
+      !localStorage.getItem(PERMISSION_BANNER_DISMISSED_KEY)
+  );
+
+  useEffect(() => {
+    if (client) connectSocket({ clientId: client.id });
+    return () => disconnectSocket();
+  }, [client?.id]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleNotification = (notification: AppNotification) => {
+      toast(notification.title, "success");
+      playNotificationSound();
+      queryClient.invalidateQueries({ queryKey: ["client", "notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["client", "appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["client", "pending-reviews"] });
+      if (notification.appointmentId) {
+        queryClient.invalidateQueries({ queryKey: ["client", "appointment", notification.appointmentId] });
+        queryClient.invalidateQueries({ queryKey: ["appointment-messages", notification.appointmentId] });
+      }
+
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        const notif = new Notification(notification.title, { body: notification.message });
+        notif.onclick = () => {
+          window.focus();
+          navigate(notification.appointmentId ? `/account/history?open=${notification.appointmentId}` : "/account/notifications");
+          notif.close();
+        };
+      }
+    };
+
+    socket.on("notification:created", handleNotification);
+    return () => {
+      socket.off("notification:created", handleNotification);
+    };
+  }, [client?.id, queryClient, toast, navigate]);
+
+  function enableNotifications() {
+    Notification.requestPermission().then(() => setShowPermissionBanner(false));
+  }
+
+  function dismissBanner() {
+    localStorage.setItem(PERMISSION_BANNER_DISMISSED_KEY, "1");
+    setShowPermissionBanner(false);
+  }
 
   return (
     <div className="min-h-screen bg-cream-50 dark:bg-plum-900">
@@ -42,6 +105,25 @@ export default function ClientLayout() {
             </button>
           )}
         </div>
+
+        {client && showPermissionBanner && (
+          <div className="mx-auto mt-3 flex max-w-4xl flex-wrap items-center justify-between gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-cream-100/90">
+            <span className="flex items-center gap-2">
+              <BellRing className="h-4 w-4 text-brand-300" /> Enable alerts to get notified about your bookings instantly.
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={enableNotifications}
+                className="rounded-full bg-gradient-brand px-3 py-1 text-xs font-semibold text-white"
+              >
+                Enable alerts
+              </button>
+              <button onClick={dismissBanner} className="text-cream-100/60 hover:text-cream-50">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       <div className="mx-auto max-w-4xl p-3 md:p-6">
@@ -79,6 +161,7 @@ export default function ClientLayout() {
               <Outlet />
             </main>
           </div>
+          <ReviewPromptModal />
         </ClientLoginGate>
       </div>
     </div>

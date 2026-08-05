@@ -1,0 +1,58 @@
+# HTTP-only edge config — for local Docker runs and for the first boot on a
+# server, before certificates have been issued. The nginx image runs envsubst
+# over this file, substituting the variables listed in NGINX_ENVSUBST_VARS.
+#
+# Switch to the https/ template dir once certbot has issued a certificate.
+
+upstream glamedge_api {
+    server api:4000;
+}
+
+upstream glamedge_web {
+    server web:80;
+}
+
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    client_max_body_size 25m;
+
+    # Let certbot answer the ACME challenge while still on plain HTTP.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location /api/ {
+        proxy_pass http://glamedge_api;
+        include /etc/nginx/includes/proxy.conf;
+    }
+
+    location /uploads/ {
+        proxy_pass http://glamedge_api;
+        include /etc/nginx/includes/proxy.conf;
+    }
+
+    location /health {
+        proxy_pass http://glamedge_api;
+        include /etc/nginx/includes/proxy.conf;
+    }
+
+    # Socket.IO needs the connection upgraded and a long read timeout, otherwise
+    # idle websockets get cut every 60s and the client reconnect-storms.
+    location /socket.io/ {
+        proxy_pass http://glamedge_api;
+        include /etc/nginx/includes/proxy.conf;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 7d;
+        proxy_send_timeout 7d;
+        proxy_buffering off;
+    }
+
+    location / {
+        proxy_pass http://glamedge_web;
+        include /etc/nginx/includes/proxy.conf;
+    }
+}

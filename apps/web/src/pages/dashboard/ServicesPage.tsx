@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,12 @@ interface ServiceTemplate {
   durationMin: number;
 }
 
+interface TemplatesResponse {
+  templates: ServiceTemplate[];
+  page: number;
+  totalPages: number;
+}
+
 export default function ServicesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -26,28 +32,38 @@ export default function ServicesPage() {
     queryFn: async () => (await api.get<{ services: Service[] }>("/api/services")).data,
   });
 
-  const { data: templatesData } = useQuery({
-    queryKey: ["services", "templates"],
-    queryFn: async () => (await api.get("/api/services/templates")).data,
-  });
-
   const [category, setCategory] = useState<CategoryType>("LADIES");
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [durationMin, setDurationMin] = useState("30");
+  const [templateSearchInput, setTemplateSearchInput] = useState("");
   const [templateSearch, setTemplateSearch] = useState("");
   const [templateCategory, setTemplateCategory] = useState<CategoryType | "ALL">("ALL");
   const addFormRef = useRef<HTMLDivElement>(null);
 
-  const templates: ServiceTemplate[] = templatesData?.templates || [];
-  const filteredTemplates = useMemo(() => {
-    const q = templateSearch.trim().toLowerCase();
-    return templates.filter((t) => {
-      if (templateCategory !== "ALL" && t.category !== templateCategory) return false;
-      if (q && !t.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [templates, templateSearch, templateCategory]);
+  useEffect(() => {
+    const timer = setTimeout(() => setTemplateSearch(templateSearchInput.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [templateSearchInput]);
+
+  const {
+    data: templatesData,
+    fetchNextPage: fetchNextTemplates,
+    hasNextPage: hasMoreTemplates,
+    isFetchingNextPage: isFetchingMoreTemplates,
+  } = useInfiniteQuery({
+    queryKey: ["services", "templates", templateSearch, templateCategory],
+    queryFn: async ({ pageParam }: { pageParam: number }) =>
+      (
+        await api.get<TemplatesResponse>("/api/services/templates", {
+          params: { page: pageParam, search: templateSearch || undefined, category: templateCategory },
+        })
+      ).data,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined),
+  });
+
+  const filteredTemplates = templatesData?.pages.flatMap((p) => p.templates) || [];
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["services"] });
 
@@ -105,55 +121,64 @@ export default function ServicesPage() {
         </CardContent>
       </Card>
 
-      {templates.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick-add Presets</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative max-w-xs flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-plum-300" />
-                <Input
-                  value={templateSearch}
-                  onChange={(e) => setTemplateSearch(e.target.value)}
-                  placeholder="Search presets..."
-                  className="pl-9"
-                />
-              </div>
-              <div className="flex gap-1.5">
-                {(["ALL", "LADIES", "GENTS", "KIDS"] as const).map((c) => (
-                  <Button
-                    key={c}
-                    size="sm"
-                    variant={templateCategory === c ? "default" : "outline"}
-                    onClick={() => setTemplateCategory(c)}
-                  >
-                    {c === "ALL" ? "All" : c === "LADIES" ? "Ladies" : c === "GENTS" ? "Gents" : "Kids"}
-                  </Button>
-                ))}
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick-add Presets</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative max-w-xs flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-plum-300" />
+              <Input
+                value={templateSearchInput}
+                onChange={(e) => setTemplateSearchInput(e.target.value)}
+                placeholder="Search presets..."
+                className="pl-9"
+              />
             </div>
-            {filteredTemplates.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {filteredTemplates.map((tpl) => (
-                  <Button
-                    key={tpl.name}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => loadTemplateIntoForm(tpl)}
-                    title="Load into Add Service — you can change price and duration before adding"
-                  >
-                    {tpl.name} · {formatCurrency(tpl.price)}
-                  </Button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-plum-300 dark:text-cream-100/40">No presets match this filter.</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+            <div className="flex gap-1.5">
+              {(["ALL", "LADIES", "GENTS", "KIDS"] as const).map((c) => (
+                <Button
+                  key={c}
+                  size="sm"
+                  variant={templateCategory === c ? "default" : "outline"}
+                  onClick={() => setTemplateCategory(c)}
+                >
+                  {c === "ALL" ? "All" : c === "LADIES" ? "Ladies" : c === "GENTS" ? "Gents" : "Kids"}
+                </Button>
+              ))}
+            </div>
+          </div>
+          {filteredTemplates.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {filteredTemplates.map((tpl) => (
+                <Button
+                  key={tpl.name}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => loadTemplateIntoForm(tpl)}
+                  title="Load into Add Service — you can change price and duration before adding"
+                >
+                  {tpl.name} · {formatCurrency(tpl.price)}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-plum-300 dark:text-cream-100/40">No presets match this filter.</p>
+          )}
+          {hasMoreTemplates && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-start"
+              onClick={() => fetchNextTemplates()}
+              disabled={isFetchingMoreTemplates}
+            >
+              {isFetchingMoreTemplates ? "Loading..." : "Load more presets"}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -6,10 +6,17 @@ import { setClientAuth } from "@/store/clientAuthSlice";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type Step = "phone" | "otp";
 
-export function ClientLoginGate({ children }: { children: React.ReactNode }) {
+interface Props {
+  children: React.ReactNode;
+  title?: string;
+  compact?: boolean;
+}
+
+export function ClientLoginGate({ children, title = "Log in to book an appointment", compact = false }: Props) {
   const token = useAppSelector((s) => s.clientAuth.token);
   const client = useAppSelector((s) => s.clientAuth.client);
   const [step, setStep] = useState<Step>("phone");
@@ -62,9 +69,9 @@ export function ClientLoginGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="glass-panel flex flex-col items-center gap-3 p-6 text-center">
+    <div className={cn("glass-panel flex flex-col items-center text-center", compact ? "gap-2 p-4" : "gap-3 p-6")}>
       <p className="text-sm font-semibold text-plum-700 dark:text-cream-50">
-        {step === "phone" ? "Log in to book an appointment" : "Enter the OTP we sent you"}
+        {step === "phone" ? title : "Enter the OTP we sent you"}
       </p>
 
       {step === "phone" && (

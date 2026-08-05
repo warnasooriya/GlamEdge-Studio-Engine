@@ -2,6 +2,7 @@
   "name": "glamedge-saas",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "concurrently -n api,web -c blue,magenta \"pnpm --filter api dev\" \"pnpm --filter web dev\"",
     "build": "pnpm --filter api build && pnpm --filter web build",

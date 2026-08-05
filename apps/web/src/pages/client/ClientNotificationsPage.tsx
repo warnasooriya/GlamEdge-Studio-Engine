@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { Bell, CheckCircle2, XCircle, Star, Receipt, CheckCheck } from "lucide-react";
+import {
+  Bell,
+  CheckCircle2,
+  XCircle,
+  Star,
+  Receipt,
+  CheckCheck,
+  CalendarClock,
+  MessageCircle,
+  AlertTriangle,
+} from "lucide-react";
 import { clientApi } from "@/lib/clientApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +31,13 @@ const TYPE_ICON: Record<NotificationType, typeof Bell> = {
   BOOKING_CANCELLED: XCircle,
   REVIEW_THANKS: Star,
   INVOICE_READY: Receipt,
+  RESCHEDULE_PROPOSED: CalendarClock,
+  RESCHEDULE_ACCEPTED: CheckCircle2,
+  RESCHEDULE_DECLINED: XCircle,
+  NEW_MESSAGE: MessageCircle,
+  REVIEW_SUBMITTED: Star,
+  SUBSCRIPTION_EXPIRING: AlertTriangle,
+  SUBSCRIPTION_EXPIRED: AlertTriangle,
 };
 
 export default function ClientNotificationsPage() {

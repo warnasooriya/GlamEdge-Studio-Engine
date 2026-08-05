@@ -32,12 +32,32 @@ export async function verifyOtpAndAuth(req: Request, res: Response) {
       throw new HttpError(400, "salonName and ownerName are required to register a new salon");
     }
     const slug = await generateUniqueSlug(salonName);
+    // New salons start PENDING — no dashboard access until an administrator approves them.
     tenant = await prisma.tenant.create({
       data: { phone, salonName, ownerName, slug },
     });
   }
 
   await consumeOtp(phone);
+
+  if (tenant.status === "REJECTED") {
+    throw new HttpError(
+      403,
+      tenant.rejectionReason
+        ? `Your salon registration was not approved: ${tenant.rejectionReason}`
+        : "Your salon registration was not approved. Contact support for details."
+    );
+  }
+  if (tenant.status === "SUSPENDED") {
+    throw new HttpError(403, "Your account has been suspended. Contact support for details.");
+  }
+  if (tenant.status === "PENDING") {
+    return res.status(200).json({
+      success: true,
+      pendingApproval: true,
+      message: "Your salon registration is pending admin approval. We'll notify you once it's reviewed.",
+    });
+  }
 
   if (tenant.logoUrl) tenant.logoUrl = await storageProvider.resolveUrl(tenant.logoUrl);
   const token = signToken({ tenantId: tenant.id, phone: tenant.phone });

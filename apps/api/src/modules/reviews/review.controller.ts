@@ -1,9 +1,12 @@
 import { Response, Request } from "express";
 import { prisma } from "@/config/prisma";
+import { AuthRequest } from "@/middlewares/requireAuth";
 import { HttpError } from "@/middlewares/errorHandler";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { sendWhatsAppText } from "@/services/whatsapp/whatsappService";
 import { createNotification } from "@/services/notifications/notificationService";
+import { createOwnerNotification } from "@/services/notifications/ownerNotificationService";
+import { emitToTenant } from "@/realtime/socket";
 import { createReviewSchema } from "./review.schema";
 
 // Verified Review Engine: only clients with a completed, billed appointment
@@ -71,7 +74,41 @@ export async function createVerifiedReview(req: Request, res: Response) {
     }
   }
 
+  try {
+    await createOwnerNotification({
+      tenantId: tenant.id,
+      appointmentId: appointment.id,
+      type: "REVIEW_SUBMITTED",
+      title: "New review",
+      message: `${appointment.clientName} left a ${rating}-star review${comment ? `: "${comment}"` : "."}`,
+    });
+  } catch (err) {
+    console.error("Owner notification create failed:", err);
+  }
+
+  emitToTenant(tenant.id, "review:created", { appointmentId: appointment.id, rating });
+
   return res.status(201).json({ success: true, review });
+}
+
+export async function listOwnerReviews(req: AuthRequest, res: Response) {
+  const tenantId = req.tenantId!;
+  const { page, pageSize, skip, take } = parsePagination(req.query, 10, 50);
+  const where = { tenantId };
+
+  const [reviews, total, aggregate] = await Promise.all([
+    prisma.review.findMany({ where, orderBy: { createdAt: "desc" }, skip, take }),
+    prisma.review.count({ where }),
+    prisma.review.aggregate({ where, _avg: { rating: true } }),
+  ]);
+
+  return res.json({
+    success: true,
+    reviews,
+    avgRating: aggregate._avg.rating ?? 0,
+    count: total,
+    ...paginationMeta(total, page, pageSize),
+  });
 }
 
 export async function listPublicReviews(req: Request, res: Response) {

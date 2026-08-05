@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import {
-  Sparkles,
   ArrowRight,
   Store,
   Search,
@@ -22,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
+import { GlamEdgeLogo } from "@/components/shared/GlamEdgeLogo";
 import { PortfolioLightbox } from "@/components/shared/PortfolioLightbox";
 import { Service, Tenant } from "@/types";
 
@@ -133,7 +133,7 @@ export default function LandingPage() {
         <nav className="relative z-10 mx-auto flex max-w-7xl items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-brand shadow-glow sm:h-10 sm:w-10">
-              <Sparkles className="h-5 w-5 text-white" />
+              <GlamEdgeLogo className="h-5 w-5 text-white" />
             </div>
             <span className="font-display text-lg font-semibold text-cream-50 sm:text-xl">GlamEdge</span>
           </div>

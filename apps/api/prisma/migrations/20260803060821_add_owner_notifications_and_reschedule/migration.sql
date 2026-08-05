@@ -1,0 +1,28 @@
+-- AlterTable
+ALTER TABLE `appointments` ADD COLUMN `proposedBookingTime` DATETIME(3) NULL,
+    ADD COLUMN `proposedStaffId` VARCHAR(191) NULL,
+    ADD COLUMN `rescheduleStatus` ENUM('NONE', 'PROPOSED') NOT NULL DEFAULT 'NONE';
+
+-- AlterTable
+ALTER TABLE `notifications` MODIFY `type` ENUM('BOOKING_REQUESTED', 'BOOKING_CONFIRMED', 'BOOKING_CANCELLED', 'REVIEW_THANKS', 'INVOICE_READY', 'RESCHEDULE_PROPOSED', 'RESCHEDULE_ACCEPTED', 'RESCHEDULE_DECLINED', 'NEW_MESSAGE') NOT NULL;
+
+-- CreateTable
+CREATE TABLE `owner_notifications` (
+    `id` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(191) NOT NULL,
+    `appointmentId` VARCHAR(191) NULL,
+    `type` ENUM('BOOKING_REQUESTED', 'BOOKING_CONFIRMED', 'BOOKING_CANCELLED', 'REVIEW_THANKS', 'INVOICE_READY', 'RESCHEDULE_PROPOSED', 'RESCHEDULE_ACCEPTED', 'RESCHEDULE_DECLINED', 'NEW_MESSAGE') NOT NULL,
+    `title` VARCHAR(191) NOT NULL,
+    `message` TEXT NOT NULL,
+    `isRead` BOOLEAN NOT NULL DEFAULT false,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `owner_notifications_tenantId_idx`(`tenantId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `appointments` ADD CONSTRAINT `appointments_proposedStaffId_fkey` FOREIGN KEY (`proposedStaffId`) REFERENCES `staff`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `owner_notifications` ADD CONSTRAINT `owner_notifications_tenantId_fkey` FOREIGN KEY (`tenantId`) REFERENCES `tenants`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

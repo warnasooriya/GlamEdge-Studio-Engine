@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Heart, MessageCircle, Play, Maximize2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { clientApi } from "@/lib/clientApi";
 import { getVisitorId } from "@/lib/visitor";
+import { useAppSelector } from "@/hooks/redux";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
+import { ClientLoginGate } from "@/components/booking/ClientLoginGate";
 import { FeedMediaItem, FeedPost } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +41,11 @@ function MediaCarousel({ media, alt, onOpenViewer }: { media: FeedMediaItem[]; a
             {m.type === "video" ? (
               <video src={m.url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
             ) : (
-              <img src={m.url} className="h-full w-full object-cover transition-transform duration-300" alt={alt} />
+              <img
+                src={m.url}
+                className="h-full w-full object-cover transition-transform duration-500 group-hover/media:scale-105"
+                alt={alt}
+              />
             )}
             {m.type === "video" && (
               <span className="absolute inset-0 flex items-center justify-center bg-black/15">
@@ -86,7 +93,7 @@ export function PostCard({ post, onOpenViewer }: { post: FeedPost; onOpenViewer:
   }
 
   return (
-    <div className="glass-panel group overflow-hidden">
+    <div className="glass-panel group overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
       <div className="overflow-hidden">
         <MediaCarousel media={post.media} alt={post.caption || "salon work"} onOpenViewer={onOpenViewer} />
       </div>
@@ -113,12 +120,13 @@ export function PostCard({ post, onOpenViewer }: { post: FeedPost; onOpenViewer:
 type CommentItem = { _id: string; authorName: string; text: string };
 
 function CommentsSection({ postId }: { postId: string }) {
+  const client = useAppSelector((s) => s.clientAuth.client);
   const [comments, setComments] = useState<CommentItem[] | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [name, setName] = useState("");
   const [text, setText] = useState("");
+  const [posting, setPosting] = useState(false);
 
   async function load(targetPage: number, append: boolean) {
     const res = await api.get(`/api/feed/${postId}/comments`, { params: { page: targetPage } });
@@ -139,10 +147,15 @@ function CommentsSection({ postId }: { postId: string }) {
   }
 
   async function submit() {
-    if (!name || !text) return;
-    await api.post(`/api/feed/${postId}/comments`, { authorName: name, text });
-    setText("");
-    load(1, false);
+    if (!text.trim()) return;
+    setPosting(true);
+    try {
+      await clientApi.post(`/api/feed/${postId}/comments`, { text: text.trim() });
+      setText("");
+      load(1, false);
+    } finally {
+      setPosting(false);
+    }
   }
 
   if (comments === null) {
@@ -151,11 +164,15 @@ function CommentsSection({ postId }: { postId: string }) {
 
   return (
     <div className="flex flex-col gap-2 border-t border-plum-100 pt-2 dark:border-white/10">
-      {comments.map((c) => (
-        <p key={c._id} className="text-xs text-plum-600 dark:text-cream-100/80">
-          <span className="font-semibold text-plum-800 dark:text-cream-50">{c.authorName}:</span> {c.text}
-        </p>
-      ))}
+      {comments.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {comments.map((c) => (
+            <p key={c._id} className="break-words text-xs text-plum-600 dark:text-cream-100/80">
+              <span className="font-semibold text-plum-800 dark:text-cream-50">{c.authorName}:</span> {c.text}
+            </p>
+          ))}
+        </div>
+      )}
       {page < totalPages && (
         <button
           onClick={loadMore}
@@ -165,24 +182,25 @@ function CommentsSection({ postId }: { postId: string }) {
           {loadingMore ? "Loading..." : "Load more comments"}
         </button>
       )}
-      <div className="flex gap-1">
-        <input
-          className="h-8 flex-1 rounded-lg border border-plum-100 bg-white/90 px-2 text-xs dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"
-          placeholder="Your name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <input
-          className="h-8 flex-[2] rounded-lg border border-plum-100 bg-white/90 px-2 text-xs dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"
-          placeholder="Add a comment..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
-        />
-        <button onClick={submit} className="rounded-lg bg-gradient-brand px-2.5 text-xs font-semibold text-white">
-          Post
-        </button>
-      </div>
+
+      <ClientLoginGate compact title="Log in to leave a comment">
+        <div className="flex gap-1.5">
+          <input
+            className="h-8 min-w-0 flex-1 rounded-lg border border-plum-100 bg-white/90 px-2 text-xs dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"
+            placeholder={client ? `Comment as ${client.name}` : "Add a comment..."}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+          />
+          <button
+            onClick={submit}
+            disabled={posting || !text.trim()}
+            className="shrink-0 rounded-lg bg-gradient-brand px-3 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            Post
+          </button>
+        </div>
+      </ClientLoginGate>
     </div>
   );
 }

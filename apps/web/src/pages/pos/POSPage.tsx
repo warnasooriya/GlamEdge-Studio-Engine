@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/shared/Pagination";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
+import { WalkInSaleForm } from "@/components/pos/WalkInSaleForm";
 import { useToast } from "@/components/ui/toast";
 import { formatCurrency } from "@/lib/utils";
 import { Appointment, Invoice, PaymentMode } from "@/types";
@@ -25,6 +26,14 @@ interface AppointmentsResponse {
   pageSize: number;
   total: number;
   totalPages: number;
+}
+
+interface CreateInvoiceResponse {
+  invoiceUrl: string;
+  receiptImageUrl: string;
+  totalAmount: number;
+  whatsappSent: boolean;
+  hasPhone: boolean;
 }
 
 export default function POSPage() {
@@ -73,12 +82,23 @@ export default function POSPage() {
 
   const createInvoice = useMutation({
     mutationFn: async (id: string) =>
-      api.post(`/api/billing/appointments/${id}/invoice`, {
-        paymentMode: paymentModeByAppt[id] || "CASH",
-      }),
-    onSuccess: (res) => {
-      toast(`Receipt sent — ${formatCurrency(res.data.totalAmount)}`, "success");
-      window.open(res.data.receiptImageUrl, "_blank");
+      (
+        await api.post<CreateInvoiceResponse>(`/api/billing/appointments/${id}/invoice`, {
+          paymentMode: paymentModeByAppt[id] || "CASH",
+        })
+      ).data,
+    onSuccess: (data) => {
+      if (data.whatsappSent) {
+        toast(`Receipt sent via WhatsApp — ${formatCurrency(data.totalAmount)}`, "success");
+      } else if (!data.hasPhone) {
+        toast(`Billed ${formatCurrency(data.totalAmount)} — no phone on file, opening the receipt to share manually.`, "success");
+      } else {
+        toast(
+          `Billed ${formatCurrency(data.totalAmount)}, but the WhatsApp send failed — opening the receipt so you can share it manually.`,
+          "error"
+        );
+      }
+      window.open(data.receiptImageUrl, "_blank");
       setPendingPage(1);
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
       queryClient.invalidateQueries({ queryKey: ["ledger"] });
@@ -89,6 +109,8 @@ export default function POSPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <WalkInSaleForm />
+
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">

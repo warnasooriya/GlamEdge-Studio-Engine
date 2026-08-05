@@ -15,6 +15,11 @@ export function initRealtime(server: HttpServer): SocketIOServer {
       socket.join(tenantRoom(tenantId));
     }
 
+    const clientId = socket.handshake.query.clientId as string | undefined;
+    if (clientId) {
+      socket.join(clientRoom(clientId));
+    }
+
     socket.on("disconnect", () => {
       // no-op: socket.io cleans up room membership automatically
     });
@@ -27,6 +32,14 @@ export function tenantRoom(tenantId: string): string {
   return `tenant:${tenantId}`;
 }
 
+export function clientRoom(clientId: string): string {
+  return `client:${clientId}`;
+}
+
 export function emitToTenant(tenantId: string, event: string, payload: unknown): void {
   io?.to(tenantRoom(tenantId)).emit(event, payload);
+}
+
+export function emitToClient(clientId: string, event: string, payload: unknown): void {
+  io?.to(clientRoom(clientId)).emit(event, payload);
 }

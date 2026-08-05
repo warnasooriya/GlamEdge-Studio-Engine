@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarClock, Bell, ArrowRight } from "lucide-react";
@@ -6,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { STATUS_VARIANT } from "@/components/appointments/AppointmentRow";
+import { ClientAppointmentDetailModal } from "@/components/appointments/ClientAppointmentDetailModal";
 import { AppNotification, ClientAppointment } from "@/types";
 
 interface HistoryResponse {
@@ -19,6 +21,8 @@ interface NotificationsResponse {
 }
 
 export default function ClientDashboardHome() {
+  const [showDetail, setShowDetail] = useState(false);
+
   const { data: historyData } = useQuery({
     queryKey: ["client", "appointments", "overview"],
     queryFn: async () =>
@@ -70,6 +74,11 @@ export default function ClientDashboardHome() {
                   <span className="font-medium text-plum-700 dark:text-cream-50">{upcoming.tenant.salonName}</span>
                   <CategoryBadge category={upcoming.category} />
                   <Badge variant={STATUS_VARIANT[upcoming.status]}>{upcoming.status}</Badge>
+                  {upcoming.rescheduleStatus === "PROPOSED" && (
+                    <button onClick={() => setShowDetail(true)}>
+                      <Badge variant="outline">Action needed</Badge>
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs text-plum-400 dark:text-cream-100/50">
                   {new Date(upcoming.bookingTime).toLocaleString()} •{" "}
@@ -116,6 +125,14 @@ export default function ClientDashboardHome() {
           </Link>
         </CardContent>
       </Card>
+
+      {upcoming && showDetail && (
+        <ClientAppointmentDetailModal
+          appointmentId={upcoming.id}
+          open={showDetail}
+          onOpenChange={setShowDetail}
+        />
+      )}
     </div>
   );
 }

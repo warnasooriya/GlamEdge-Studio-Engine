@@ -1,5 +1,6 @@
 import { NotificationType } from "@prisma/client";
 import { prisma } from "@/config/prisma";
+import { emitToClient } from "@/realtime/socket";
 
 interface CreateNotificationInput {
   clientId: string;
@@ -11,5 +12,7 @@ interface CreateNotificationInput {
 }
 
 export async function createNotification(input: CreateNotificationInput) {
-  return prisma.notification.create({ data: input });
+  const notification = await prisma.notification.create({ data: input });
+  emitToClient(input.clientId, "notification:created", notification);
+  return notification;
 }
