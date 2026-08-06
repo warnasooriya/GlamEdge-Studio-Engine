@@ -36,6 +36,10 @@ export const env = {
     apiKey: optional("NOTIFYLK_API_KEY"),
     senderId: optional("NOTIFYLK_SENDER_ID"),
   },
+  textLk: {
+    apiToken: optional("TEXTLK_API_TOKEN"),
+    senderId: optional("TEXTLK_SENDER_ID"),
+  },
 
   aws: {
     accessKeyId: optional("AWS_ACCESS_KEY_ID"),
