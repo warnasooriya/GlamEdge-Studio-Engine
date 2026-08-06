@@ -1,10 +1,26 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
+// The GA tag is embedded statically in index.html (Google's own install
+// instructions, verbatim) so their detector — which reads raw HTML, not the
+// rendered DOM — can find it. That means `vite dev` would otherwise report
+// every local session as live traffic, so strip the block for dev serving
+// only; `vite build` (what ships in the Docker image) keeps it untouched.
+function stripAnalyticsInDev(): Plugin {
+  return {
+    name: "strip-analytics-in-dev",
+    apply: "serve",
+    transformIndexHtml(html) {
+      return html.replace(/<!-- ga-tag:start -->[\s\S]*?<!-- ga-tag:end -->/, "");
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
+    stripAnalyticsInDev(),
     react(),
     VitePWA({
       registerType: "autoUpdate",

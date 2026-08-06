@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { initAnalytics, trackPageView } from "@/lib/analytics";
+import { trackPageView } from "@/lib/analytics";
 import OnboardingPage from "@/pages/auth/OnboardingPage";
 import DashboardLayout from "@/pages/dashboard/DashboardLayout";
 import DashboardHome from "@/pages/dashboard/DashboardHome";
@@ -31,10 +31,6 @@ import AdminPaymentsPage from "@/pages/admin/AdminPaymentsPage";
 
 export default function App() {
   const location = useLocation();
-
-  useEffect(() => {
-    initAnalytics();
-  }, []);
 
   useEffect(() => {
     trackPageView(location.pathname + location.search);

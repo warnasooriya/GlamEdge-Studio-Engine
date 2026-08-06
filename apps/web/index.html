@@ -1,6 +1,20 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- ga-tag:start -->
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9ZZB39T6H5"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { dataLayer.push(arguments); }
+      gtag('js', new Date());
+      // send_page_view:false — this is a client-routed SPA, so the automatic
+      // pageview from this config call would fire once and then go silent on
+      // every in-app navigation after. src/lib/analytics.ts sends page_view
+      // explicitly instead, including this first one, on every route change.
+      gtag('config', 'G-9ZZB39T6H5', { send_page_view: false });
+    </script>
+    <!-- ga-tag:end -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#831049" />
