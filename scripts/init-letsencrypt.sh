@@ -35,7 +35,9 @@ if [ "$DOMAIN" = "localhost" ]; then
   exit 1
 fi
 
-compose() { docker compose "$@"; }
+# The certbot service sits behind the "tls" profile so small hosts do not pull it
+# until HTTPS is actually being set up — which is exactly now.
+compose() { docker compose --profile tls "$@"; }
 
 echo "==> Domain: $DOMAIN"
 if [ "$STAGING" != "0" ]; then

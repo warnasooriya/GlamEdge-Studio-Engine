@@ -1,0 +1,165 @@
+name: Deploy to EC2
+
+# Builds the API and web images on the runner, publishes them to GitHub
+# Container Registry, then tells the EC2 box to pull and restart.
+#
+# Images are built in CI rather than on the server on purpose: `pnpm install`
+# plus the Vite build is memory-hungry and will OOM a small instance.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   EC2_HOST      52.220.21.151
+#   EC2_USER      ubuntu            (or ec2-user on Amazon Linux)
+#   EC2_SSH_KEY   the full private key, "-----BEGIN...KEY-----" lines included
+# GITHUB_TOKEN is provided automatically and needs no setup.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # lets you redeploy the current main without a new commit
+
+concurrency:
+  # Never let two deploys touch the server at once; cancel a superseded run.
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  DEPLOY_DIR: /opt/glamedge
+
+jobs:
+  build:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_prefix: ${{ steps.meta.outputs.image_prefix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image names
+        id: meta
+        # Container registries reject uppercase, and this repo name has capitals.
+        run: echo "image_prefix=${REGISTRY}/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          # Tagged with the commit SHA as well as latest, so a rollback is just
+          # re-running with an older tag.
+          tags: |
+            ${{ steps.meta.outputs.image_prefix }}/api:latest
+            ${{ steps.meta.outputs.image_prefix }}/api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          # Vite inlines these at build time. "/" keeps the bundle same-origin so
+          # the image works on any hostname without a rebuild.
+          build-args: |
+            VITE_API_URL=/
+            VITE_SOCKET_URL=/
+            VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+          tags: |
+            ${{ steps.meta.outputs.image_prefix }}/web:latest
+            ${{ steps.meta.outputs.image_prefix }}/web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+  deploy:
+    name: Deploy to EC2
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Sync deployment files
+        # The server needs the compose file and the nginx configs it bind-mounts.
+        # Application code is not copied — that lives inside the images.
+        # --delete is scoped to nginx/ only, so the server's .env is never touched.
+        run: |
+          rsync -az --delete -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new" \
+            nginx/ "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ env.DEPLOY_DIR }}/nginx/"
+          rsync -az -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new" \
+            docker-compose.yml scripts/init-letsencrypt.sh .env.docker.example \
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ env.DEPLOY_DIR }}/"
+
+      - name: Pull images and restart
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            IMAGE_PREFIX='${{ needs.build.outputs.image_prefix }}' \
+            IMAGE_TAG='${{ github.sha }}' \
+            GHCR_USER='${{ github.actor }}' \
+            GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
+            DEPLOY_DIR='${{ env.DEPLOY_DIR }}' \
+            'bash -euo pipefail -s' <<'REMOTE'
+            cd "$DEPLOY_DIR"
+
+            if [ ! -f .env ]; then
+              echo "::error::$DEPLOY_DIR/.env is missing. Run scripts/server-bootstrap.sh on the server first."
+              exit 1
+            fi
+
+            # This token is only valid for the lifetime of the workflow run, so
+            # there is no long-lived registry credential sitting on the box.
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            # Persist the image coordinates so a plain `docker compose up` on the
+            # server later resolves the same images instead of trying to build.
+            grep -v -e '^IMAGE_PREFIX=' -e '^IMAGE_TAG=' .env > .env.tmp || true
+            printf 'IMAGE_PREFIX=%s\nIMAGE_TAG=%s\n' "$IMAGE_PREFIX" "$IMAGE_TAG" >> .env.tmp
+            mv .env.tmp .env
+
+            docker compose pull api web
+            docker compose up -d --remove-orphans
+            docker logout ghcr.io
+            docker image prune -f
+          REMOTE
+
+      - name: Verify the deployment is healthy
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            DEPLOY_DIR='${{ env.DEPLOY_DIR }}' 'bash -euo pipefail -s' <<'REMOTE'
+            cd "$DEPLOY_DIR"
+            # The API applies migrations before it starts serving, so first boot
+            # after a schema change legitimately takes a while.
+            for i in $(seq 1 30); do
+              if curl -fsS --max-time 5 http://localhost/health >/dev/null 2>&1; then
+                echo "Healthy after ${i} attempt(s)."
+                docker compose ps
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "::error::Health check never passed. Recent API logs:"
+            docker compose logs --tail 60 api
+            docker compose ps
+            exit 1
+          REMOTE

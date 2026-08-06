@@ -34,14 +34,29 @@ COPY apps/api apps/api
 RUN pnpm --filter api exec prisma generate
 RUN pnpm --filter api build
 
+# --- production dependencies -------------------------------------------------
+# A second, --prod install — starting from `base`, NOT `deps`. Branching off
+# `deps` would inherit its already-populated node_modules (installed WITHOUT
+# --prod for the build stage's sake), and `pnpm install --prod` only skips
+# adding devDependencies, it does not prune ones already on disk. Starting clean
+# is what actually keeps typescript/tsx/tsc-alias/@types out of the image.
+FROM base AS prod-deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY apps/api/prisma apps/api/prisma
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter api... --prod \
+    && pnpm --filter api exec prisma generate
+
 # --- runtime -----------------------------------------------------------------
 FROM base AS runtime
 ENV NODE_ENV=production
 
-# node_modules carries the generated Prisma client and the Prisma CLI, which the
-# entrypoint needs for `migrate deploy`.
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
+# Runtime dependencies only. Includes the generated Prisma client and the Prisma
+# CLI, which the entrypoint needs for `migrate deploy`.
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json

@@ -12,6 +12,18 @@ services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
+    # Defaults assume a much larger host. On a 1GB box the default 128M buffer
+    # pool plus per-connection buffers is enough to trigger the OOM killer, which
+    # takes the whole stack with it. These are floors, not tuning for throughput —
+    # raise them on a bigger instance.
+    command:
+      - --innodb-buffer-pool-size=64M
+      - --max-connections=50
+      - --performance-schema=OFF
+    deploy:
+      resources:
+        limits:
+          memory: ${MYSQL_MEM_LIMIT:-288M}
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-glamedge_root}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-glamedge}
@@ -34,6 +46,12 @@ services:
   mongo:
     image: mongo:7
     restart: unless-stopped
+    # WiredTiger otherwise reserves ~50% of host RAM for its cache.
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
+    deploy:
+      resources:
+        limits:
+          memory: ${MONGO_MEM_LIMIT:-256M}
     ports:
       - "127.0.0.1:${MONGO_HOST_PORT:-27017}:27017"
     volumes:
@@ -47,9 +65,14 @@ services:
     networks: [glamedge]
 
   redis:
-    image: redis:7
+    # alpine over the debian image: 59MB vs 192MB, and this only holds OTP codes.
+    image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    deploy:
+      resources:
+        limits:
+          memory: ${REDIS_MEM_LIMIT:-64M}
     ports:
       - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
     volumes:
@@ -62,6 +85,10 @@ services:
     networks: [glamedge]
 
   api:
+    # IMAGE_PREFIX/IMAGE_TAG are set by CI so the server pulls a prebuilt image
+    # instead of compiling on the box. Locally they are unset and compose builds
+    # from source, tagging the result with this same name.
+    image: ${IMAGE_PREFIX:-glamedge}/api:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -70,8 +97,15 @@ services:
       mysql: { condition: service_healthy }
       mongo: { condition: service_healthy }
       redis: { condition: service_healthy }
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEM_LIMIT:-288M}
     environment:
       NODE_ENV: production
+      # Keep V8's heap under the container limit so it GCs rather than being
+      # OOM-killed. Sharp's image work is the main spike.
+      NODE_OPTIONS: --max-old-space-size=256
       PORT: 4000
       # Service names, not localhost — these resolve on the compose network.
       DATABASE_URL: mysql://${MYSQL_USER:-glamedge}:${MYSQL_PASSWORD:-glamedge_pw}@mysql:3306/${MYSQL_DATABASE:-glamedge}?connection_limit=20&pool_timeout=30
@@ -107,6 +141,7 @@ services:
     networks: [glamedge]
 
   web:
+    image: ${IMAGE_PREFIX:-glamedge}/web:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -148,6 +183,10 @@ services:
   certbot:
     image: certbot/certbot:latest
     restart: unless-stopped
+    # Only started with `--profile tls`, so a 288MB image is not pulled onto a
+    # small box before there is a domain to issue a certificate for.
+    # scripts/init-letsencrypt.sh enables it as part of the HTTPS switch.
+    profiles: [tls]
     volumes:
       - certbot_conf:/etc/letsencrypt
       - certbot_www:/var/www/certbot
