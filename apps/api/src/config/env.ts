@@ -30,7 +30,7 @@ export const env = {
   jwtSecret: optional("JWT_SECRET", "dev-only-insecure-secret"),
   jwtExpiresIn: optional("JWT_EXPIRES_IN", "7d"),
 
-  otpProvider: optional("OTP_PROVIDER", "console"),
+  otpProvider: optional("OTP_PROVIDER"),
   notifyLk: {
     userId: optional("NOTIFYLK_USER_ID"),
     apiKey: optional("NOTIFYLK_API_KEY"),
