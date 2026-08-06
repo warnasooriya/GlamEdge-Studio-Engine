@@ -5,6 +5,7 @@ import { NotifyLkProvider } from "./NotifyLkProvider";
 import { TextLkProvider } from "./TextLkProvider";
 
 function buildOtpProvider(): OtpProvider {
+  console.log(`Using OTP provider: ${env.otpProvider}`);
   switch (env.otpProvider) {
     case "textlk":
       return new TextLkProvider();
