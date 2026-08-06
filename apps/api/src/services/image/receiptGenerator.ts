@@ -153,7 +153,7 @@ export async function generateReceiptImage(data: ReceiptData): Promise<Buffer> {
 
     ${dashedDivider(footerDividerY)}
 
-    <text x="${WIDTH / 2}" y="${thankYouY}" text-anchor="middle" font-size="15" font-weight="600" fill="${COLORS.plumDark}" font-family="${FONT}">Thank you for visiting! ✨</text>
+    <text x="${WIDTH / 2}" y="${thankYouY}" text-anchor="middle" font-size="15" font-weight="600" fill="${COLORS.plumDark}" font-family="${FONT}">Thank you for visiting!</text>
     <text x="${WIDTH / 2}" y="${poweredByY}" text-anchor="middle" font-size="11" fill="${COLORS.gray}" font-family="${FONT}">Powered by GlamEdge Studio Engine</text>
   </g>
 </svg>`;

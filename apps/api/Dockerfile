@@ -8,9 +8,17 @@
 
 FROM node:20-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
-# openssl is required by Prisma's query engine at runtime.
+# openssl is required by Prisma's query engine at runtime. fontconfig +
+# fonts-liberation/fonts-dejavu-core are required by sharp's SVG rasterization
+# (librsvg/pango) — receiptGenerator.ts renders <text> elements, and a bare
+# slim image ships zero fonts, so every glyph came out as an empty box on the
+# server while working fine on any dev machine with system fonts already
+# installed. fonts-liberation carries Arial/Helvetica-compatible aliases,
+# matching the "Helvetica, Arial, sans-serif" font-family the SVG requests.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && apt-get install -y --no-install-recommends \
+       openssl ca-certificates fontconfig fonts-liberation fonts-dejavu-core \
+    && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 WORKDIR /app
