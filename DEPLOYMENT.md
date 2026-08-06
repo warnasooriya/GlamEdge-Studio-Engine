@@ -1,32 +1,31 @@
 # Deployment
 
-Production runs on a single EC2 instance (`52.220.21.151`, ap-southeast-1). Every push to `main` builds
-images in GitHub Actions, publishes them to GitHub Container Registry, and restarts the stack on the box.
+Production runs at **https://glamedge.beauty** (`52.220.21.151`, ap-southeast-1, EC2). Every push to
+`main` builds images in GitHub Actions, publishes them to GitHub Container Registry, and restarts the
+stack on the box.
 
-> ## ⚠️ The current instance is undersized
+> ## ⚠️ The instance is undersized
 >
-> `t3.micro`: **1 GB RAM, 8 GB disk**. Measured on the box:
+> `t3.micro`: **1 GB RAM**. The EBS volume was resized once already (8 GB → 20 GB) and the swapfile
+> enlarged (1 GB → 2 GB) to get through this — current headroom, measured on the box:
 >
 > | Resource | Reality |
 > |---|---|
-> | Disk | 8 GB volume, fully partitioned. Ubuntu takes 2.2 GB; the MySQL and MongoDB images alone are **2.3 GB**. After a 1 GB swapfile and an apt clean, **≈900 MB** was left for the app images *and* all database data. |
-> | RAM | 908 MB with **no swap** out of the box. MySQL + MongoDB + Redis + Node + nginx do not fit; the OOM killer takes the whole stack down. |
+> | Disk | 20 GB volume, ~9 GB free. Comfortable for now; a deploy briefly needs both the old and new image on disk, and database growth eats into this over time. |
+> | RAM | 908 MB physical + a 2 GB swapfile (`vm.swappiness=10`). All 7 services (MySQL, MongoDB, Redis, API, web, nginx, certbot) fit, but lean on swap under load — expect it to show non-trivial `Swap: used` in `free -h` at rest, not just under spikes. |
 >
-> Mitigations already applied: a 1 GB swapfile (`vm.swappiness=10`), per-container memory limits summing
-> to 896 MB, `innodb-buffer-pool-size=64M`, `wiredTigerCacheSizeGB=0.25`, Redis on alpine, certbot behind
-> a profile, and a prod-only-dependency API image.
+> Mitigations already applied: per-container memory limits summing to 896 MB, `innodb-buffer-pool-size=64M`,
+> `wiredTigerCacheSizeGB=0.25`, Redis on alpine, certbot behind the `tls` profile, and a prod-only-dependency
+> API image (was 647MB with a broken prune, is 141MB now).
 >
-> **These buy headroom, they do not fix it.** There is no room for data growth, and a deploy briefly needs
-> both the old and new image on disk. Before real traffic:
->
-> **Resize the EBS volume to ≥30 GB** (AWS Console → EC2 → Volumes → Modify, ~$2/month), then on the box:
+> **These buy headroom, they do not fix it.** Before real customer traffic, move to `t3.small` (2 GB RAM) —
+> stop the instance, change the type, start it. The Elastic IP stays; a plain public IP does not, so attach
+> one first if this instance doesn't have one. If disk fills again:
 >
 > ```bash
+> # AWS Console -> EC2 -> Volumes -> Modify -> new size, then on the box:
 > sudo growpart /dev/nvme0n1 1 && sudo resize2fs /dev/nvme0n1p1 && df -h /
 > ```
->
-> **And move to `t3.small` (2 GB RAM)** — stop the instance, change the type, start it. The Elastic IP
-> stays; a plain public IP does not, so attach one first if you have not.
 >
 > With more RAM, raise the limits in `.env`: `MYSQL_MEM_LIMIT=768M`, `MONGO_MEM_LIMIT=512M`,
 > `API_MEM_LIMIT=512M`.
@@ -129,10 +128,10 @@ There is **no automated backup yet** — worth adding before real customer data 
 
 ---
 
-## Enabling HTTPS
+## HTTPS
 
-Let's Encrypt cannot issue a certificate for a bare IP, so the stack currently serves plain HTTP. Once a
-domain points at `52.220.21.151`:
+**Done.** `glamedge.beauty` has a Let's Encrypt certificate (expires 2026-11-04, auto-renews). This is the
+sequence that got there, kept here for the next domain or a rebuild from scratch:
 
 ```bash
 cd /opt/glamedge
@@ -142,23 +141,42 @@ sed -i 's|^DOMAIN=.*|DOMAIN=app.example.com|'            .env
 sed -i 's|^PUBLIC_URL=.*|PUBLIC_URL=https://app.example.com|' .env
 sed -i 's|^CERTBOT_EMAIL=.*|CERTBOT_EMAIL=you@example.com|'   .env
 
-# 2. Issue a staging certificate first (CERTBOT_STAGING=1) to prove the flow
+# 2. Issue a staging certificate first (CERTBOT_STAGING=1, the .env default) to
+#    prove the flow without touching Let's Encrypt's real rate limits
 ./init-letsencrypt.sh
 
 # 3. Switch to a real certificate
 sed -i 's|^CERTBOT_STAGING=.*|CERTBOT_STAGING=0|' .env
 ./init-letsencrypt.sh
 
-# 4. Turn on the TLS config
+# 4. Turn on the TLS config for good, and make it survive future deploys
 sed -i 's|^NGINX_TEMPLATE=.*|NGINX_TEMPLATE=https|' .env
+grep -q '^COMPOSE_PROFILES=' .env && sed -i 's|^COMPOSE_PROFILES=.*|COMPOSE_PROFILES=tls|' .env \
+  || echo 'COMPOSE_PROFILES=tls' >> .env
 docker compose up -d
 ```
 
-Renewal is automatic from then on: the `certbot` container checks twice daily and nginx reloads every six
-hours to pick up a renewed certificate.
+Two things worth knowing about that last step:
+
+- **`COMPOSE_PROFILES=tls` is not optional.** The `certbot` renewal container sits behind the `tls`
+  profile (so small instances don't pull a 288MB image before there's a domain to certify). Without this
+  var in `.env`, the very next deploy's `docker compose up -d --remove-orphans` in
+  `.github/workflows/deploy.yml` treats `certbot` as an orphan and removes it — silently killing renewal
+  until someone notices the cert is about to expire. `COMPOSE_PROFILES` in `.env` is read by every plain
+  `docker compose` invocation automatically, so this one line is what makes the workflow safe without
+  editing it.
+- Renewal itself needs nothing further: the `certbot` container checks twice daily, and nginx reloads
+  every six hours to pick up whatever it renewed.
 
 `PUBLIC_URL` matters beyond cosmetics — it is baked into the URLs of uploaded media, so leaving it as
 `http://<ip>` after moving to a domain gives you mixed-content warnings and broken images.
+
+If `init-letsencrypt.sh` complains about the recommended TLS parameters, note it copies
+`options-ssl-nginx.conf` and `ssl-dhparams.pem` out of the `certbot/certbot` image itself rather than
+fetching from GitHub — a previous version of this script used raw GitHub URLs that 404'd once certbot
+restructured its repo. If a future certbot image version moves those paths again, `docker run --rm
+--entrypoint sh certbot/certbot:latest -c 'find / -xdev -iname "options-ssl-nginx.conf" -o -iname
+"ssl-dhparams.pem"'` finds the new location.
 
 ---
 

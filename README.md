@@ -217,6 +217,7 @@ root `.env` plus the defaults baked into `docker-compose.yml`. All files are git
 | `DOMAIN` | `localhost` | Hostname nginx serves; also the certificate's subject |
 | `PUBLIC_URL` | `http://localhost` | Origin users actually visit. Sets CORS **and** the base URL baked into stored upload paths — a mismatch here is what breaks images behind a proxy |
 | `NGINX_TEMPLATE` | `http` | `http` (no TLS) or `https` (TLS + redirect). Selects which config set nginx mounts |
+| `COMPOSE_PROFILES` | *(unset)* | Set to `tls` once HTTPS is live — see [DEPLOYMENT.md](DEPLOYMENT.md#https). Compose reads this from `.env` automatically, which is what keeps the certbot renewal container from being pruned as an "orphan" on the next deploy |
 | `PORT` | `4000` | API listen port |
 | `CORS_ORIGIN` | `PUBLIC_URL` | Browser origin allowed to call the API |
 
@@ -302,12 +303,15 @@ docker compose up -d --build
 ./scripts/init-letsencrypt.sh
 
 # 4. Set CERTBOT_STAGING=0 in .env, re-run the script for a trusted certificate,
-#    then set NGINX_TEMPLATE=https in .env and bring the stack up on TLS
+#    then set NGINX_TEMPLATE=https and COMPOSE_PROFILES=tls in .env and bring
+#    the stack up on TLS
 docker compose up -d
 ```
 
 The `certbot` service then renews automatically (checks twice daily), and nginx reloads every 6 hours to
-pick up a renewed certificate.
+pick up a renewed certificate. `COMPOSE_PROFILES=tls` in step 4 matters beyond this one command — without
+it in `.env`, the next deploy's `docker compose up -d --remove-orphans` treats `certbot` as an orphaned
+container and removes it, silently ending renewal.
 
 ### How it fits together
 

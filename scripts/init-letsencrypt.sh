@@ -7,8 +7,9 @@
 # we stage a throwaway self-signed cert, start nginx, let certbot replace it with
 # the real one, then reload.
 #
-# Run once, from the repo root, on the server that owns the domain:
-#   ./scripts/init-letsencrypt.sh
+# Run once, from the deploy directory (wherever docker-compose.yml and .env
+# live — /opt/glamedge on the server; server-bootstrap.sh puts it there):
+#   cd /opt/glamedge && ./init-letsencrypt.sh
 #
 # Prerequisites:
 #   - .env exists with DOMAIN, CERTBOT_EMAIL, CERTBOT_STAGING
@@ -16,10 +17,13 @@
 #   - ports 80 and 443 are open
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
-
-if [ ! -f .env ]; then
-  echo "error: .env not found. Copy .env.docker.example to .env and fill it in." >&2
+# Deliberately does NOT `cd` based on $0 — the deploy workflow syncs this file
+# flat into the deploy directory (not into a scripts/ subfolder there), so a
+# path relative to the script's own location does not reliably land on the
+# directory that holds docker-compose.yml and .env. Operating on the caller's
+# cwd, with an explicit check, is simpler and correct in both layouts.
+if [ ! -f .env ] || [ ! -f docker-compose.yml ]; then
+  echo "error: run this from the directory with docker-compose.yml and .env (e.g. cd /opt/glamedge)." >&2
   exit 1
 fi
 
@@ -47,13 +51,17 @@ fi
 
 CERT_PATH="/etc/letsencrypt/live/$DOMAIN"
 
-echo "==> Downloading recommended TLS parameters..."
+echo "==> Staging recommended TLS parameters..."
+# Copied out of the certbot image itself rather than fetched from GitHub raw
+# URLs: those move when certbot restructures its repo (they did — the old URLs
+# here 404'd), and the running image already carries a copy in sync with the
+# certbot version actually issuing the certificate.
 compose run --rm --entrypoint "sh -c '\
   mkdir -p /etc/letsencrypt && \
   [ -f /etc/letsencrypt/options-ssl-nginx.conf ] || \
-    wget -qO /etc/letsencrypt/options-ssl-nginx.conf https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf; \
+    cp /opt/certbot/src/certbot/src/certbot/_internal/plugins/nginx/tls_configs/options-ssl-nginx.conf /etc/letsencrypt/options-ssl-nginx.conf; \
   [ -f /etc/letsencrypt/ssl-dhparams.pem ] || \
-    wget -qO /etc/letsencrypt/ssl-dhparams.pem https://raw.githubusercontent.com/certbot/certbot/master/certbot/certbot/ssl-dhparams.pem'" certbot
+    cp /opt/certbot/src/certbot/src/certbot/ssl-dhparams.pem /etc/letsencrypt/ssl-dhparams.pem'" certbot
 
 echo "==> Staging a temporary self-signed certificate so nginx can start..."
 compose run --rm --entrypoint "sh -c '\
