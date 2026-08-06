@@ -13,7 +13,7 @@ function buildOtpProvider(): OtpProvider {
       return new NotifyLkProvider();
     case "console":
     default:
-      return new ConsoleOtpProvider();
+      return new TextLkProvider();
   }
 }
 
