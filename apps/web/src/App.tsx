@@ -1,4 +1,6 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { initAnalytics, trackPageView } from "@/lib/analytics";
 import OnboardingPage from "@/pages/auth/OnboardingPage";
 import DashboardLayout from "@/pages/dashboard/DashboardLayout";
 import DashboardHome from "@/pages/dashboard/DashboardHome";
@@ -28,6 +30,16 @@ import AdminTenantsPage from "@/pages/admin/AdminTenantsPage";
 import AdminPaymentsPage from "@/pages/admin/AdminPaymentsPage";
 
 export default function App() {
+  const location = useLocation();
+
+  useEffect(() => {
+    initAnalytics();
+  }, []);
+
+  useEffect(() => {
+    trackPageView(location.pathname + location.search);
+  }, [location.pathname, location.search]);
+
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
