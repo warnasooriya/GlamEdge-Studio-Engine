@@ -38,6 +38,19 @@ server {
         include /etc/nginx/includes/proxy.conf;
     }
 
+    # SEO: the API injects per-salon meta/JSON-LD into the SPA shell so crawlers
+    # that don't execute JS still see real content — see seo.controller.ts. Must
+    # come before the generic "location /" so it wins for these two paths only.
+    location /salon/ {
+        proxy_pass http://glamedge_api;
+        include /etc/nginx/includes/proxy.conf;
+    }
+
+    location = /sitemap.xml {
+        proxy_pass http://glamedge_api;
+        include /etc/nginx/includes/proxy.conf;
+    }
+
     # Socket.IO needs the connection upgraded and a long read timeout, otherwise
     # idle websockets get cut every 60s and the client reconnect-storms.
     location /socket.io/ {

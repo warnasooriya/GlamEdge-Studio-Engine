@@ -21,6 +21,7 @@ import { ownerNotificationRouter } from "@/modules/notifications/ownerNotificati
 import { analyticsRouter } from "@/modules/analytics/analytics.routes";
 import { reportsRouter } from "@/modules/reports/reports.routes";
 import { adminRouter } from "@/modules/admin/admin.routes";
+import { renderSalonPage, renderSitemap } from "@/modules/seo/seo.controller";
 
 export const app = express();
 
@@ -31,6 +32,10 @@ app.use(morgan("dev"));
 app.use("/uploads", express.static("uploads"));
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+// Not under /api — these serve HTML/XML directly to crawlers. See seo.controller.ts.
+app.get("/salon/:slug", renderSalonPage);
+app.get("/sitemap.xml", renderSitemap);
 
 app.use("/api/auth", authRouter);
 app.use("/api/client-auth", clientAuthRouter);
