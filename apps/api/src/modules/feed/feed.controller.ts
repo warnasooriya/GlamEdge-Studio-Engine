@@ -13,7 +13,18 @@ import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { createPostSchema, likeSchema, commentSchema } from "./feed.schema";
 
 async function resolveMediaUrls<T extends { url: string }>(media: T[]): Promise<T[]> {
-  return Promise.all(media.map(async (m) => ({ ...m, url: await storageProvider.resolveUrl(m.url) })));
+  // Mongoose subdocuments store schema fields (type, width, height, ...) behind
+  // getters rather than as own-enumerable properties, so spreading one directly
+  // silently drops them while internal bookkeeping props (e.g. $__parent) survive
+  // the spread instead. toObject() first gives a plain object with the real
+  // fields — without it, every video post's `type` came back undefined and the
+  // frontend rendered it as a broken <img> instead of a <video>.
+  return Promise.all(
+    media.map(async (m) => {
+      const plain = (typeof (m as any).toObject === "function" ? (m as any).toObject() : m) as T;
+      return { ...plain, url: await storageProvider.resolveUrl(plain.url) };
+    })
+  );
 }
 
 export async function createPost(req: AuthRequest, res: Response) {
