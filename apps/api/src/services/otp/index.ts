@@ -6,7 +6,9 @@ import { TextLkProvider } from "./TextLkProvider";
 
 function buildOtpProvider(): OtpProvider {
   console.log(`Using OTP provider: ${env.otpProvider}`);
-  switch (env.otpProvider) {
+  // Lowercased so OTP_PROVIDER=textLk / TextLK / etc. all resolve the same way —
+  // the switch below is otherwise case-sensitive and would silently fall through.
+  switch (env.otpProvider.toLowerCase()) {
     case "textlk":
       return new TextLkProvider();
     case "notifylk":

@@ -17,16 +17,29 @@ export class TextLkProvider implements OtpProvider {
 
     const formattedPhone = phone.startsWith("0") ? `94${phone.slice(1)}` : phone;
 
-    await axios.post(
+    // "plain", not "otp" — Text.lk's "otp" type expects a placeholder in the
+    // message that THEIR gateway fills in with a code it generates itself
+    // ("No OTP placeholder found in the message" if you send fully-composed
+    // text). We already generate and validate our own code via otpStore, so
+    // "plain" — which accepts arbitrary text as-is — is the correct type here.
+    const res = await axios.post(
       "https://app.text.lk/api/http/sms/send",
       {
         api_token: apiToken,
         recipient: formattedPhone,
         sender_id: senderId,
-        type: "otp",
+        type: "plain",
         message: `Your GlamEdge verification code is ${code}. Valid for 5 minutes.`,
       },
       { headers: { "Content-Type": "application/json", Accept: "application/json" } }
     );
+
+    // Text.lk returns HTTP 200 even for logical failures (e.g. bad sender_id,
+    // insufficient balance) — the failure only shows up in the response body.
+    // Without this check, every send "succeeds" from our side regardless of
+    // whether the SMS actually went out.
+    if (res.data?.status !== "success") {
+      throw new Error(`Text.lk send failed: ${res.data?.message || "unknown error"}`);
+    }
   }
 }
