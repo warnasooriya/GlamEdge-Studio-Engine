@@ -138,6 +138,12 @@ jobs:
 
             docker compose pull api web
             docker compose up -d --remove-orphans
+            # nginx's config comes from a bind-mounted template dir (envsubst runs
+            # once at container start), so rsync-ing new templates above has no
+            # effect until nginx restarts — `up -d` alone won't do it, since the
+            # bind mount's *contents* changing isn't a service-config diff compose
+            # tracks.
+            docker compose restart nginx
             docker logout ghcr.io
             docker image prune -f
           REMOTE
