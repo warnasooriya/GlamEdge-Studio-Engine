@@ -8,11 +8,29 @@ let state: State = "starting";
 let lastQrDataUrl: string | null = null;
 let client: Client;
 
-function formatChatId(phone: string): string {
-  // Mirrors apps/api's formatPhone: local "0"-prefixed numbers are Sri Lankan
-  // and become "94..."; anything else is assumed already-international.
-  const digits = phone.startsWith("0") ? `94${phone.slice(1)}` : phone;
-  return `${digits}@c.us`;
+function sanitizePhone(phone: string): string {
+  // Strips spaces/dashes/"+" etc. first — a stored number that isn't in
+  // exactly the shape the old string-splicing expected (e.g. "+94...",
+  // "077-123-4567") produced a malformed id that never matched a real
+  // contact. `client.phone` is free-text with no format validation, so
+  // any of these shapes can genuinely be sitting in the database.
+  const digitsOnly = phone.replace(/\D/g, "");
+  if (digitsOnly.startsWith("00")) return digitsOnly.slice(2); // "00"-prefixed international dialing
+  if (digitsOnly.startsWith("0")) return `94${digitsOnly.slice(1)}`; // local Sri Lankan number
+  return digitsOnly; // already has a country code
+}
+
+// A hand-built "<digits>@c.us" id that doesn't match any real WhatsApp
+// contact doesn't necessarily fail loudly — this resolves it through
+// WhatsApp's own lookup instead, so an invalid number throws here (and
+// falls back to the Cloud API in apps/api) rather than the message
+// silently landing wherever an unresolved chat id happens to land.
+async function resolveChatId(phone: string): Promise<string> {
+  const numberId = await client.getNumberId(sanitizePhone(phone));
+  if (!numberId) {
+    throw new Error(`${phone} is not a WhatsApp number (resolved as ${sanitizePhone(phone)})`);
+  }
+  return numberId._serialized;
 }
 
 function buildClient(): Client {
@@ -95,13 +113,17 @@ export async function sendText(phone: string, message: string) {
   if (state !== "ready") {
     throw new Error(`WhatsApp Web session not ready (state: ${state})`);
   }
-  await client.sendMessage(formatChatId(phone), message);
+  const chatId = await resolveChatId(phone);
+  console.log(`[whatsapp-web] Sending text to ${phone} → resolved chat ${chatId}`);
+  await client.sendMessage(chatId, message);
 }
 
 export async function sendImage(phone: string, imageUrl: string, caption: string) {
   if (state !== "ready") {
     throw new Error(`WhatsApp Web session not ready (state: ${state})`);
   }
+  const chatId = await resolveChatId(phone);
+  console.log(`[whatsapp-web] Sending image to ${phone} → resolved chat ${chatId}`);
   const media = await MessageMedia.fromUrl(imageUrl, { unsafeMime: true });
-  await client.sendMessage(formatChatId(phone), media, { caption });
+  await client.sendMessage(chatId, media, { caption });
 }
