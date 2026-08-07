@@ -1,3 +1,5 @@
+import { existsSync, unlinkSync } from "fs";
+import { join } from "path";
 import { Client, LocalAuth, MessageMedia } from "whatsapp-web.js";
 import QRCode from "qrcode";
 import { config } from "@/config";
@@ -33,6 +35,28 @@ async function resolveChatId(phone: string): Promise<string> {
   return numberId._serialized;
 }
 
+// If the previous container instance didn't shut Chromium down cleanly (a
+// redeploy killing it before it finished exiting, an OOM kill, etc.), these
+// lock files survive in the persisted session volume and Chromium refuses to
+// reuse the profile on the next launch — "profile appears to be in use by
+// another Chromium process" — even though nothing is actually still running.
+// A fresh process starting up can never legitimately hold them itself, so
+// clearing them here is always safe.
+function cleanStaleChromiumLocks() {
+  const profileDir = join(config.sessionDataPath, "session");
+  for (const name of ["SingletonLock", "SingletonCookie", "SingletonSocket"]) {
+    const path = join(profileDir, name);
+    if (existsSync(path)) {
+      try {
+        unlinkSync(path);
+        console.log(`[whatsapp-web] Removed stale ${name} from a previous unclean shutdown.`);
+      } catch (err) {
+        console.error(`[whatsapp-web] Failed to remove stale ${name}:`, err);
+      }
+    }
+  }
+}
+
 function buildClient(): Client {
   return new Client({
     authStrategy: new LocalAuth({ dataPath: config.sessionDataPath }),
@@ -56,6 +80,7 @@ function buildClient(): Client {
 }
 
 export function initWhatsAppClient() {
+  cleanStaleChromiumLocks();
   client = buildClient();
 
   client.on("qr", async (qr) => {
@@ -86,19 +111,28 @@ export function initWhatsAppClient() {
   client.on("disconnected", (reason) => {
     state = "disconnected";
     console.error("[whatsapp-web] Disconnected:", reason, "— reinitializing in 5s.");
-    setTimeout(() => {
-      client = buildClient();
-      wireAndInit();
-    }, 5000);
+    setTimeout(initWhatsAppClient, 5000);
   });
 
   client.initialize().catch((err) => {
-    console.error("[whatsapp-web] Failed to initialize:", err);
+    // Without a retry here, a launch failure (e.g. a lock file survived an
+    // unclean shutdown) left the service stuck reporting "starting" forever
+    // — no QR, nothing to proxy, no way to recover short of a manual restart.
+    console.error("[whatsapp-web] Failed to initialize:", err, "— retrying in 10s.");
+    setTimeout(initWhatsAppClient, 10_000);
   });
 }
 
-function wireAndInit() {
-  initWhatsAppClient();
+// Docker sends SIGTERM on a redeploy/restart — destroying the client here
+// gives Chromium the chance to exit cleanly and remove its own lock files,
+// instead of getting SIGKILLed after the grace period and leaving stale
+// locks for cleanStaleChromiumLocks() to clear on the next boot.
+export async function shutdownWhatsAppClient() {
+  try {
+    await client?.destroy();
+  } catch (err) {
+    console.error("[whatsapp-web] Error during shutdown:", err);
+  }
 }
 
 export function getStatus() {

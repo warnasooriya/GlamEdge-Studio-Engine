@@ -1,7 +1,14 @@
 import "express-async-errors";
 import express, { NextFunction, Request, Response } from "express";
 import { config } from "@/config";
-import { getQrDataUrl, getStatus, initWhatsAppClient, sendImage, sendText } from "@/whatsappClient";
+import {
+  getQrDataUrl,
+  getStatus,
+  initWhatsAppClient,
+  sendImage,
+  sendText,
+  shutdownWhatsAppClient,
+} from "@/whatsappClient";
 
 const app = express();
 app.use(express.json());
@@ -60,3 +67,14 @@ app.listen(config.port, () => {
 });
 
 initWhatsAppClient();
+
+// docker compose stop/restart sends SIGTERM — shutting Chromium down cleanly
+// here is what stops a redeploy from leaving stale profile locks behind for
+// the next boot to trip over (see cleanStaleChromiumLocks in whatsappClient.ts).
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.on(signal, async () => {
+    console.log(`[whatsapp-web] ${signal} received, shutting down...`);
+    await shutdownWhatsAppClient();
+    process.exit(0);
+  });
+}
