@@ -14,6 +14,7 @@ import {
   listTenantPayments,
   listAllPayments,
 } from "./admin.controller";
+import { getWhatsAppQr, getWhatsAppStatus } from "./adminWhatsApp.controller";
 
 export const adminRouter = Router();
 
@@ -31,3 +32,5 @@ adminRouter.patch("/tenants/:id/subscription", updateTenantSubscription);
 adminRouter.get("/tenants/:id/payments", listTenantPayments);
 adminRouter.post("/tenants/:id/payments", recordPayment);
 adminRouter.get("/payments", listAllPayments);
+adminRouter.get("/whatsapp/status", getWhatsAppStatus);
+adminRouter.get("/whatsapp/qr", getWhatsAppQr);

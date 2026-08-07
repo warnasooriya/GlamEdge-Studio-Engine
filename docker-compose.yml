@@ -129,6 +129,12 @@ services:
       AWS_CLOUDFRONT_URL: ${AWS_CLOUDFRONT_URL:-}
       WHATSAPP_CLOUD_API_TOKEN: ${WHATSAPP_CLOUD_API_TOKEN:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      # Primary bill-sending path — see apps/whatsapp-web/README.md. Left
+      # blank, sendWhatsAppText/Image fall straight through to the Cloud API
+      # above, so an unconfigured or crash-looping whatsapp-web service never
+      # blocks a deploy or a bill from going out.
+      WHATSAPP_WEB_SERVICE_URL: ${WHATSAPP_WEB_SERVICE_URL:-http://whatsapp-web:5000}
+      WHATSAPP_WEB_INTERNAL_SECRET: ${WHATSAPP_WEB_INTERNAL_SECRET:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@glamedge.dev}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
@@ -140,6 +146,46 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
+    networks: [glamedge]
+
+  # Drives a real WhatsApp Web session (Chromium via puppeteer) instead of
+  # Meta's Cloud API, so bills can go out without business verification. Kept
+  # as its own service, not bundled into apps/api, specifically so an
+  # unofficial-library crash or its ~300MB Chromium footprint can never take
+  # down bookings or payments — see apps/whatsapp-web/README.md, including
+  # the memory budget this assumes and why it needs a bigger instance than
+  # the one this stack was originally tuned for.
+  whatsapp-web:
+    image: ${IMAGE_PREFIX:-glamedge}/whatsapp-web:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/whatsapp-web/Dockerfile
+    restart: unless-stopped
+    # Chromium needs real shared memory to render — Docker's 64MB default is
+    # too small and causes silent renderer crashes.
+    shm_size: 512m
+    deploy:
+      resources:
+        limits:
+          memory: ${WHATSAPP_WEB_MEM_LIMIT:-450M}
+    environment:
+      PORT: 5000
+      # No `:?required` here on purpose: an empty secret makes THIS container
+      # crash-loop (see apps/whatsapp-web/src/config.ts) rather than failing
+      # `docker compose up` for every other service too. Generate one with
+      # `openssl rand -hex 32` and set it in .env before relying on this path.
+      WHATSAPP_WEB_INTERNAL_SECRET: ${WHATSAPP_WEB_INTERNAL_SECRET:-}
+      SESSION_DATA_PATH: /app/apps/whatsapp-web/.wwebjs_auth
+    volumes:
+      # Session login persists here — without this volume, every redeploy
+      # would log the salon's WhatsApp out and require rescanning the QR code.
+      - whatsapp_web_session:/app/apps/whatsapp-web/.wwebjs_auth
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks: [glamedge]
 
   web:
@@ -203,6 +249,7 @@ volumes:
   mongo_data:
   redis_data:
   api_uploads:
+  whatsapp_web_session:
   certbot_conf:
   certbot_www:
 

@@ -53,6 +53,10 @@ export const env = {
     token: optional("WHATSAPP_CLOUD_API_TOKEN"),
     phoneNumberId: optional("WHATSAPP_PHONE_NUMBER_ID"),
   },
+  whatsappWeb: {
+    serviceUrl: optional("WHATSAPP_WEB_SERVICE_URL", "http://whatsapp-web:5000"),
+    internalSecret: optional("WHATSAPP_WEB_INTERNAL_SECRET"),
+  },
 
   adminBootstrap: {
     email: optional("ADMIN_EMAIL", "admin@glamedge.dev"),
@@ -65,5 +69,6 @@ export const isS3Configured = Boolean(
 );
 
 export const isWhatsAppConfigured = Boolean(env.whatsapp.token && env.whatsapp.phoneNumberId);
+export const isWhatsAppWebConfigured = Boolean(env.whatsappWeb.internalSecret);
 
 export { required };

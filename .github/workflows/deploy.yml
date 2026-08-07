@@ -84,6 +84,18 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,scope=web,mode=max
 
+      - name: Build and push whatsapp-web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/whatsapp-web/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_prefix }}/whatsapp-web:latest
+            ${{ steps.meta.outputs.image_prefix }}/whatsapp-web:${{ github.sha }}
+          cache-from: type=gha,scope=whatsapp-web
+          cache-to: type=gha,scope=whatsapp-web,mode=max
+
   deploy:
     name: Deploy to EC2
     needs: build
@@ -136,7 +148,7 @@ jobs:
             printf 'IMAGE_PREFIX=%s\nIMAGE_TAG=%s\n' "$IMAGE_PREFIX" "$IMAGE_TAG" >> .env.tmp
             mv .env.tmp .env
 
-            docker compose pull api web
+            docker compose pull api web whatsapp-web
             docker compose up -d --remove-orphans
             # nginx's config comes from a bind-mounted template dir (envsubst runs
             # once at container start), so rsync-ing new templates above has no

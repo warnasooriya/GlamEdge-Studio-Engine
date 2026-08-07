@@ -1,5 +1,6 @@
 import axios from "axios";
-import { env, isWhatsAppConfigured } from "@/config/env";
+import { env, isWhatsAppConfigured, isWhatsAppWebConfigured } from "@/config/env";
+import { sendImageViaWhatsAppWeb, sendTextViaWhatsAppWeb } from "@/services/whatsapp/whatsappWebClient";
 
 function formatPhone(clientPhone: string): string {
   return clientPhone.startsWith("0") ? `94${clientPhone.slice(1)}` : clientPhone;
@@ -7,12 +8,24 @@ function formatPhone(clientPhone: string): string {
 
 // Freeform (non-template) WhatsApp messages only deliver within WhatsApp's 24-hour
 // customer-service window; outside that window Meta requires a pre-approved template.
+// whatsapp-web.js has no such restriction, so it's tried first when configured — the
+// Cloud API here only exists as a fallback for when that session is logged out,
+// crash-looping, or not yet scanned in. See apps/whatsapp-web/README.md.
 export async function sendWhatsAppText(clientPhone: string, message: string) {
   const formattedPhone = formatPhone(clientPhone);
 
+  if (isWhatsAppWebConfigured) {
+    try {
+      await sendTextViaWhatsAppWeb(clientPhone, message);
+      return { via: "whatsapp-web" };
+    } catch (error) {
+      console.error("whatsapp-web text send failed, falling back to Cloud API:", error);
+    }
+  }
+
   if (!isWhatsAppConfigured) {
     console.log(
-      `[whatsapp:dev-stub] Would send text to ${formattedPhone}: ${message} (set WHATSAPP_CLOUD_API_TOKEN / WHATSAPP_PHONE_NUMBER_ID to send for real)`
+      `[whatsapp:dev-stub] Would send text to ${formattedPhone}: ${message} (set WHATSAPP_WEB_INTERNAL_SECRET or WHATSAPP_CLOUD_API_TOKEN / WHATSAPP_PHONE_NUMBER_ID to send for real)`
     );
     return { stubbed: true };
   }
@@ -43,9 +56,18 @@ export async function sendWhatsAppText(clientPhone: string, message: string) {
 export async function sendWhatsAppImage(clientPhone: string, imageUrl: string, caption: string) {
   const formattedPhone = formatPhone(clientPhone);
 
+  if (isWhatsAppWebConfigured) {
+    try {
+      await sendImageViaWhatsAppWeb(clientPhone, imageUrl, caption);
+      return { via: "whatsapp-web" };
+    } catch (error) {
+      console.error("whatsapp-web image send failed, falling back to Cloud API:", error);
+    }
+  }
+
   if (!isWhatsAppConfigured) {
     console.log(
-      `[whatsapp:dev-stub] Would send image to ${formattedPhone}: ${caption} — ${imageUrl} (set WHATSAPP_CLOUD_API_TOKEN / WHATSAPP_PHONE_NUMBER_ID to send for real)`
+      `[whatsapp:dev-stub] Would send image to ${formattedPhone}: ${caption} — ${imageUrl} (set WHATSAPP_WEB_INTERNAL_SECRET or WHATSAPP_CLOUD_API_TOKEN / WHATSAPP_PHONE_NUMBER_ID to send for real)`
     );
     return { stubbed: true };
   }

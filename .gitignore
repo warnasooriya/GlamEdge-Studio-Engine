@@ -11,3 +11,5 @@ coverage/
 .vite/
 .turbo/
 *.tsbuildinfo
+apps/whatsapp-web/.wwebjs_auth/
+apps/whatsapp-web/.wwebjs_cache/

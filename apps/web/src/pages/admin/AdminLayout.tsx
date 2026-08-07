@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Building2, Wallet, LogOut, Sparkles } from "lucide-react";
+import { LayoutDashboard, Building2, Wallet, LogOut, Sparkles, MessageCircle } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
 import { adminLogout } from "@/store/adminAuthSlice";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/admin/tenants", label: "Salons", icon: Building2 },
   { to: "/admin/payments", label: "Payments", icon: Wallet },
+  { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
 ];
 
 export default function AdminLayout() {

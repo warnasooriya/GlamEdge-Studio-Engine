@@ -28,6 +28,7 @@ import AdminLayout from "@/pages/admin/AdminLayout";
 import AdminOverviewPage from "@/pages/admin/AdminOverviewPage";
 import AdminTenantsPage from "@/pages/admin/AdminTenantsPage";
 import AdminPaymentsPage from "@/pages/admin/AdminPaymentsPage";
+import AdminWhatsAppPage from "@/pages/admin/AdminWhatsAppPage";
 
 export default function App() {
   const location = useLocation();
@@ -73,6 +74,7 @@ export default function App() {
           <Route index element={<AdminOverviewPage />} />
           <Route path="tenants" element={<AdminTenantsPage />} />
           <Route path="payments" element={<AdminPaymentsPage />} />
+          <Route path="whatsapp" element={<AdminWhatsAppPage />} />
         </Route>
       </Route>
 
