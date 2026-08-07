@@ -168,10 +168,28 @@ export function BookingForm({ slug, services, staff }: Props) {
         </select>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        <Input type="date" min={today} value={date} onChange={(e) => setDate(e.target.value)} />
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="relative">
+          <Input
+            type="date"
+            min={today}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="h-11"
+          />
+          {/* iOS Safari renders an empty type="date" input as a totally blank
+              box — no "dd/mm/yyyy" hint the way desktop browsers show one —
+              so without this it looks broken rather than just empty. This
+              covers whatever (if anything) the browser natively draws with a
+              same-background label, giving one consistent look everywhere. */}
+          {!date && (
+            <span className="pointer-events-none absolute inset-0 flex items-center rounded-lg bg-white/90 pl-3.5 text-sm text-plum-300 dark:bg-plum-700/60 dark:text-cream-100/40">
+              Pick a date
+            </span>
+          )}
+        </div>
         <select
-          className={SELECT_CLASS}
+          className={cn(SELECT_CLASS, "h-11 w-full")}
           value={time}
           disabled={!date}
           onChange={(e) => setTime(e.target.value)}
