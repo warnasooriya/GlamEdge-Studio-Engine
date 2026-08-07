@@ -27,7 +27,7 @@ export default function AppointmentsPage() {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [view, setView] = useState<"list" | "calendar">("list");
+  const [view, setView] = useState<"list" | "calendar">("calendar");
   const [filter, setFilter] = useState<AppointmentStatus | "ALL">("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -210,7 +210,7 @@ export default function AppointmentsPage() {
               {data && <Pagination page={data.page} totalPages={data.totalPages} onPageChange={setPage} />}
             </>
           ) : (
-            <BookingsCalendar status={filter} onUpdateStatus={handleUpdateStatus} />
+            <BookingsCalendar status={filter} onOpenDetails={setDetailsId} />
           )}
         </CardContent>
       </Card>

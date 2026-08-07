@@ -10,14 +10,19 @@ import { useToast } from "@/components/ui/toast";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
 import { clientLogout } from "@/store/clientAuthSlice";
 import { formatCurrency, cn } from "@/lib/utils";
-import { generateTimeSlots, toLocalDateStr } from "@/lib/timeSlots";
+import { DEFAULT_WORKING_DAYS, generateTimeSlots, isWorkingDay, toLocalDateStr } from "@/lib/timeSlots";
 import { CategoryType, Service, Staff } from "@/types";
 
 interface Props {
   slug: string;
   services: Service[];
   staff: Staff[];
+  openTime?: string | null;
+  closeTime?: string | null;
+  workingDays?: number[] | null;
 }
+
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const SELECT_CLASS =
   "h-10 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50 disabled:opacity-50";
@@ -29,7 +34,7 @@ function availableCategories(services: Service[]): CategoryType[] {
   return ALL_CATEGORIES.filter((c) => present.has(c));
 }
 
-export function BookingForm({ slug, services, staff }: Props) {
+export function BookingForm({ slug, services, staff, openTime, closeTime, workingDays }: Props) {
   const { toast } = useToast();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -43,8 +48,13 @@ export function BookingForm({ slug, services, staff }: Props) {
   const [clientName, setClientName] = useState(client.name);
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
 
+  const effectiveWorkingDays = workingDays?.length ? workingDays : DEFAULT_WORKING_DAYS;
   const today = toLocalDateStr(new Date());
-  const timeSlots = useMemo(() => generateTimeSlots(date), [date]);
+  const dateIsOpen = useMemo(() => isWorkingDay(date, effectiveWorkingDays), [date, effectiveWorkingDays]);
+  const timeSlots = useMemo(
+    () => (dateIsOpen ? generateTimeSlots(date, new Date(), openTime ?? undefined, closeTime ?? undefined) : []),
+    [date, dateIsOpen, openTime, closeTime]
+  );
 
   useEffect(() => {
     if (time && !timeSlots.includes(time)) setTime("");
@@ -191,10 +201,16 @@ export function BookingForm({ slug, services, staff }: Props) {
         <select
           className={cn(SELECT_CLASS, "h-11 w-full")}
           value={time}
-          disabled={!date}
+          disabled={!date || !dateIsOpen}
           onChange={(e) => setTime(e.target.value)}
         >
-          <option value="">{date ? "Select a time" : "Pick a date first"}</option>
+          <option value="">
+            {!date
+              ? "Pick a date first"
+              : !dateIsOpen
+                ? `Closed on ${WEEKDAY_NAMES[new Date(date + "T00:00:00").getDay()]}s`
+                : "Select a time"}
+          </option>
           {timeSlots.map((slot) => (
             <option key={slot} value={slot}>
               {slot}
@@ -202,6 +218,11 @@ export function BookingForm({ slug, services, staff }: Props) {
           ))}
         </select>
       </div>
+      {date && !dateIsOpen && (
+        <p className="-mt-1 text-xs text-red-500">
+          This salon is closed on {WEEKDAY_NAMES[new Date(date + "T00:00:00").getDay()]}s. Please pick another date.
+        </p>
+      )}
 
       <Input placeholder="Your name" value={clientName} onChange={(e) => setClientName(e.target.value)} />
 

@@ -94,6 +94,12 @@ model Tenant {
   latitude              Float?
   longitude             Float?
   contactPhone          String?            @db.VarChar(50)
+  // Both null = not configured yet, and every existing behavior (9am-8pm,
+  // every day) stays exactly as it was before this feature — see
+  // apps/api/src/utils/businessHours.ts for the fallback.
+  openTime              String?            @db.VarChar(5) // "09:00"
+  closeTime             String?            @db.VarChar(5) // "20:00"
+  workingDays           Json? // int[] using JS Date.getDay() (0=Sunday..6=Saturday)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 

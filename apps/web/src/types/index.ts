@@ -20,6 +20,9 @@ export interface Tenant {
   latitude?: number | null;
   longitude?: number | null;
   contactPhone?: string | null;
+  openTime?: string | null;
+  closeTime?: string | null;
+  workingDays?: number[] | null;
   status: TenantStatus;
   rejectionReason?: string | null;
   approvedAt?: string | null;

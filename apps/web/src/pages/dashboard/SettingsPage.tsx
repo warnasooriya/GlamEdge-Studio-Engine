@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Store, Upload } from "lucide-react";
+import { Store, Upload, Clock } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,20 @@ import { LocationPicker } from "@/components/shared/LocationPicker";
 import { useToast } from "@/components/ui/toast";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
 import { updateTenant as setTenant } from "@/store/authSlice";
+import { cn } from "@/lib/utils";
 import { Tenant } from "@/types";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+
+const WEEKDAYS = [
+  { value: 0, label: "Sun" },
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+];
 
 export default function SettingsPage() {
   const tenant = useAppSelector((s) => s.auth.tenant);
@@ -23,8 +34,15 @@ export default function SettingsPage() {
   const [latitude, setLatitude] = useState<number | null>(tenant?.latitude ?? null);
   const [longitude, setLongitude] = useState<number | null>(tenant?.longitude ?? null);
   const [contactPhone, setContactPhone] = useState(tenant?.contactPhone || "");
+  const [openTime, setOpenTime] = useState(tenant?.openTime || "09:00");
+  const [closeTime, setCloseTime] = useState(tenant?.closeTime || "20:00");
+  const [workingDays, setWorkingDays] = useState<number[]>(tenant?.workingDays?.length ? tenant.workingDays : [0, 1, 2, 3, 4, 5, 6]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(tenant?.logoUrl || null);
+
+  function toggleWorkingDay(day: number) {
+    setWorkingDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()));
+  }
 
   function handleLogoSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -49,6 +67,9 @@ export default function SettingsPage() {
       api.patch<{ tenant: Tenant }>("/api/tenants/me", {
         address,
         contactPhone,
+        openTime,
+        closeTime,
+        workingDays,
         ...(latitude !== null && longitude !== null ? { latitude, longitude } : {}),
       }),
   });
@@ -56,6 +77,14 @@ export default function SettingsPage() {
   const saving = uploadLogo.isPending || updateProfile.isPending;
 
   async function handleSave() {
+    if (workingDays.length === 0) {
+      toast("Select at least one working day", "error");
+      return;
+    }
+    if (openTime >= closeTime) {
+      toast("Opening time must be before closing time", "error");
+      return;
+    }
     try {
       let latestTenant: Tenant | undefined;
 
@@ -134,12 +163,67 @@ export default function SettingsPage() {
               onChange={(e) => setContactPhone(e.target.value)}
             />
           </div>
-
-          <Button onClick={handleSave} disabled={saving} className="self-start">
-            {saving ? "Saving..." : "Save Changes"}
-          </Button>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-brand-500" /> Working Hours
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <p className="text-sm text-plum-400 dark:text-cream-100/60">
+            Customers can only book appointments within these hours, on the days you're open.
+          </p>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-plum-400 dark:text-cream-100/50">Opens at</label>
+              <Input
+                type="time"
+                className="w-36"
+                value={openTime}
+                onChange={(e) => setOpenTime(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-plum-400 dark:text-cream-100/50">Closes at</label>
+              <Input
+                type="time"
+                className="w-36"
+                value={closeTime}
+                onChange={(e) => setCloseTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-plum-400 dark:text-cream-100/50">Open on</label>
+            <div className="flex flex-wrap gap-1.5">
+              {WEEKDAYS.map((d) => (
+                <button
+                  key={d.value}
+                  type="button"
+                  onClick={() => toggleWorkingDay(d.value)}
+                  className={cn(
+                    "rounded-full border-2 px-3.5 py-1.5 text-xs font-medium transition-all",
+                    workingDays.includes(d.value)
+                      ? "border-transparent bg-gradient-brand text-white shadow-glow"
+                      : "border-plum-100 text-plum-500 hover:border-brand-300 dark:border-white/10 dark:text-cream-100/70"
+                  )}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Button onClick={handleSave} disabled={saving} className="self-start">
+        {saving ? "Saving..." : "Save Changes"}
+      </Button>
     </div>
   );
 }

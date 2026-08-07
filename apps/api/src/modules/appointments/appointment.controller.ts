@@ -6,6 +6,7 @@ import { HttpError } from "@/middlewares/errorHandler";
 import { emitToTenant } from "@/realtime/socket";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { isPubliclyVisible } from "@/utils/publicTenant";
+import { isWithinBusinessHours } from "@/utils/businessHours";
 import { sendWhatsAppText } from "@/services/whatsapp/whatsappService";
 import { createNotification } from "@/services/notifications/notificationService";
 import { createOwnerNotification } from "@/services/notifications/ownerNotificationService";
@@ -97,6 +98,10 @@ export async function createPublicAppointment(req: ClientAuthRequest, res: Respo
 
   const data = createAppointmentSchema.parse(req.body);
   const { clientId, phone: clientPhone } = req.clientAuth!;
+
+  if (!isWithinBusinessHours(tenant, new Date(data.bookingTime))) {
+    throw new HttpError(400, "That time is outside the salon's working hours. Please pick another slot.");
+  }
 
   const services = await prisma.service.findMany({
     where: { id: { in: data.serviceIds }, tenantId: tenant.id, isActive: true },

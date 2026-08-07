@@ -20,7 +20,8 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { AppointmentRow, STATUS_VARIANT } from "./AppointmentRow";
+import { DaySchedule } from "./DaySchedule";
+import { useAppSelector } from "@/hooks/redux";
 import { Appointment, AppointmentStatus } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -35,12 +36,13 @@ const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function BookingsCalendar({
   status,
-  onUpdateStatus,
+  onOpenDetails,
 }: {
   status: AppointmentStatus | "ALL";
-  onUpdateStatus: (id: string, status: AppointmentStatus) => void;
+  onOpenDetails: (id: string) => void;
 }) {
-  const [mode, setMode] = useState<"month" | "day">("month");
+  const tenant = useAppSelector((s) => s.auth.tenant);
+  const [mode, setMode] = useState<"month" | "day">("day");
   const [month, setMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
 
@@ -189,21 +191,17 @@ export function BookingsCalendar({
 
       <div className={cn(mode === "month" && "border-t border-plum-100 pt-3 dark:border-white/10")}>
         {mode === "month" && (
-          <p className="mb-1 text-sm font-medium text-plum-700 dark:text-cream-50">
+          <p className="mb-2 text-sm font-medium text-plum-700 dark:text-cream-50">
             {format(selectedDate, "EEEE, MMMM d")}
           </p>
         )}
-        <div className="flex flex-col divide-y divide-plum-100 dark:divide-white/10">
-          {selectedAppointments.length ? (
-            selectedAppointments.map((appt) => (
-              <AppointmentRow key={appt.id} appointment={appt} onUpdateStatus={onUpdateStatus} />
-            ))
-          ) : (
-            <p className="py-6 text-center text-sm text-plum-300 dark:text-cream-100/40">
-              No bookings on this day.
-            </p>
-          )}
-        </div>
+        <DaySchedule
+          date={selectedDate}
+          appointments={selectedAppointments}
+          onOpenDetails={onOpenDetails}
+          openTime={tenant?.openTime || undefined}
+          closeTime={tenant?.closeTime || undefined}
+        />
       </div>
     </div>
   );

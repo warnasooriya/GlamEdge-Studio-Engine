@@ -80,6 +80,8 @@ function tenantSortExpr(sort: TenantSort): Prisma.Sql {
   }
 }
 
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 const updateTenantSchema = z.object({
   salonName: z.string().min(2).max(191).optional(),
   ownerName: z.string().min(2).max(191).optional(),
@@ -88,6 +90,9 @@ const updateTenantSchema = z.object({
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
   contactPhone: z.string().max(50).optional(),
+  openTime: z.string().regex(TIME_RE, "Use HH:MM, e.g. 09:00").optional(),
+  closeTime: z.string().regex(TIME_RE, "Use HH:MM, e.g. 20:00").optional(),
+  workingDays: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional(),
 });
 
 export async function listPublicTenants(req: Request, res: Response) {
@@ -183,6 +188,9 @@ export async function getPublicTenantBySlug(req: Request, res: Response) {
       latitude: true,
       longitude: true,
       contactPhone: true,
+      openTime: true,
+      closeTime: true,
+      workingDays: true,
       services: { where: { isActive: true } },
       staff: { where: { isActive: true }, select: { id: true, name: true, role: true } },
     },
