@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Store, Upload, Clock } from "lucide-react";
+import { Store, Upload, Clock, QrCode, Download, MessageCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,48 @@ export default function SettingsPage() {
   const [workingDays, setWorkingDays] = useState<number[]>(tenant?.workingDays?.length ? tenant.workingDays : [0, 1, 2, 3, 4, 5, 6]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(tenant?.logoUrl || null);
+
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const publicProfileUrl = tenant?.slug ? `${window.location.origin}/salon/${tenant.slug}` : "";
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    setQrLoading(true);
+    api
+      .get<Blob>("/api/tenants/me/qrcode", { responseType: "blob" })
+      .then((res) => {
+        objectUrl = URL.createObjectURL(res.data);
+        setQrCodeUrl(objectUrl);
+      })
+      .catch(() => setQrCodeUrl(null))
+      .finally(() => setQrLoading(false));
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, []);
+
+  function handleDownloadQrCode() {
+    if (!qrCodeUrl) return;
+    const link = document.createElement("a");
+    link.href = qrCodeUrl;
+    link.download = `${tenant?.slug || "salon"}-qr-code.png`;
+    link.click();
+  }
+
+  const shareQrCodeViaWhatsApp = useMutation({
+    mutationFn: async () => api.post("/api/tenants/me/qrcode/share-whatsapp"),
+  });
+
+  async function handleShareQrCodeViaWhatsApp() {
+    try {
+      await shareQrCodeViaWhatsApp.mutateAsync();
+      toast("QR code sent to your WhatsApp", "success");
+    } catch (err: any) {
+      toast(err.response?.data?.error || "Failed to send QR code", "error");
+    }
+  }
 
   function toggleWorkingDay(day: number) {
     setWorkingDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()));
@@ -162,6 +204,56 @@ export default function SettingsPage() {
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <QrCode className="h-4 w-4 text-brand-500" /> Share Profile QR Code
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <p className="text-sm text-plum-400 dark:text-cream-100/60">
+            Customers who scan this code land straight on your public profile at{" "}
+            <span className="font-medium text-plum-600 dark:text-cream-100">{publicProfileUrl}</span>.
+          </p>
+
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+            <div className="flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-plum-100 bg-white dark:border-white/10">
+              {qrLoading ? (
+                <span className="text-xs text-plum-400 dark:text-cream-100/50">Loading...</span>
+              ) : qrCodeUrl ? (
+                <img src={qrCodeUrl} alt="Salon profile QR code" className="h-full w-full object-contain" />
+              ) : (
+                <span className="px-2 text-center text-xs text-plum-400 dark:text-cream-100/50">
+                  Couldn't load QR code
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadQrCode}
+                disabled={!qrCodeUrl}
+                className="justify-start"
+              >
+                <Download className="h-3.5 w-3.5" /> Download image
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleShareQrCodeViaWhatsApp}
+                disabled={shareQrCodeViaWhatsApp.isPending}
+                className="justify-start"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                {shareQrCodeViaWhatsApp.isPending ? "Sending..." : "Send to my WhatsApp"}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

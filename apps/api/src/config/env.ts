@@ -18,6 +18,11 @@ export const env = {
   port: Number(optional("PORT", "4000")),
   corsOrigin: optional("CORS_ORIGIN", "http://localhost:5173"),
 
+  // Public origin of the customer-facing web app, used to build shareable links
+  // (e.g. the salon's public profile QR code). Falls back to CORS_ORIGIN since
+  // that's already the frontend's origin in every existing deployment.
+  frontendUrl: optional("FRONTEND_URL", optional("CORS_ORIGIN", "http://localhost:5173")).replace(/\/+$/, ""),
+
   // Base URL that locally-stored uploads are served from. Behind a reverse proxy
   // set this to the public origin (https://your-domain), or to an empty string to
   // emit same-origin relative URLs. Defaults to the dev API origin.

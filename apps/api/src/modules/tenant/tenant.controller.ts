@@ -8,6 +8,9 @@ import { AuthRequest } from "@/middlewares/requireAuth";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { publicTenantSql, isPubliclyVisible } from "@/utils/publicTenant";
 import { storageProvider } from "@/services/storage";
+import { generateSalonQrCode } from "@/services/image/qrCodeGenerator";
+import { sendWhatsAppImage } from "@/services/whatsapp/whatsappService";
+import { env } from "@/config/env";
 import { Post } from "@/models/Post";
 
 const TENANT_CARD_SELECT = {
@@ -226,4 +229,39 @@ export async function uploadTenantLogo(req: AuthRequest, res: Response) {
   tenant.logoUrl = await storageProvider.resolveUrl(tenant.logoUrl!);
 
   return res.json({ success: true, tenant });
+}
+
+function salonPublicUrl(slug: string): string {
+  return `${env.frontendUrl}/salon/${slug}`;
+}
+
+export async function getTenantQrCode(req: AuthRequest, res: Response) {
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId! }, select: { slug: true } });
+  if (!tenant) throw new HttpError(404, "Salon not found");
+
+  const buffer = await generateSalonQrCode(salonPublicUrl(tenant.slug));
+  res.setHeader("Content-Type", "image/png");
+  res.setHeader("Cache-Control", "no-store");
+  return res.send(buffer);
+}
+
+export async function shareTenantQrCodeViaWhatsApp(req: AuthRequest, res: Response) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: req.tenantId! },
+    select: { slug: true, salonName: true, phone: true },
+  });
+  if (!tenant) throw new HttpError(404, "Salon not found");
+
+  const buffer = await generateSalonQrCode(salonPublicUrl(tenant.slug));
+  const key = `qrcodes/${req.tenantId}/profile.png`;
+  await storageProvider.upload(key, buffer, "image/png");
+  const imageUrl = await storageProvider.getSignedUrl(key);
+
+  await sendWhatsAppImage(
+    tenant.phone,
+    imageUrl,
+    `Scan this QR code to open ${tenant.salonName}'s public profile, or share it with your customers.`
+  );
+
+  return res.json({ success: true });
 }
