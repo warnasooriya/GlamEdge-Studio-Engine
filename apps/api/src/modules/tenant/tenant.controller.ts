@@ -8,7 +8,7 @@ import { AuthRequest } from "@/middlewares/requireAuth";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
 import { publicTenantSql, isPubliclyVisible } from "@/utils/publicTenant";
 import { storageProvider } from "@/services/storage";
-import { generateSalonQrCode } from "@/services/image/qrCodeGenerator";
+import { generateSalonQrCard } from "@/services/image/qrCodeGenerator";
 import { sendWhatsAppImage } from "@/services/whatsapp/whatsappService";
 import { env } from "@/config/env";
 import { Post } from "@/models/Post";
@@ -236,10 +236,17 @@ function salonPublicUrl(slug: string): string {
 }
 
 export async function getTenantQrCode(req: AuthRequest, res: Response) {
-  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId! }, select: { slug: true } });
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: req.tenantId! },
+    select: { slug: true, salonName: true, logoUrl: true },
+  });
   if (!tenant) throw new HttpError(404, "Salon not found");
 
-  const buffer = await generateSalonQrCode(salonPublicUrl(tenant.slug));
+  const buffer = await generateSalonQrCard({
+    salonName: tenant.salonName,
+    logoUrl: tenant.logoUrl ? await storageProvider.resolveUrl(tenant.logoUrl) : null,
+    publicUrl: salonPublicUrl(tenant.slug),
+  });
   res.setHeader("Content-Type", "image/png");
   res.setHeader("Cache-Control", "no-store");
   return res.send(buffer);
@@ -248,11 +255,15 @@ export async function getTenantQrCode(req: AuthRequest, res: Response) {
 export async function shareTenantQrCodeViaWhatsApp(req: AuthRequest, res: Response) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: req.tenantId! },
-    select: { slug: true, salonName: true, phone: true },
+    select: { slug: true, salonName: true, phone: true, logoUrl: true },
   });
   if (!tenant) throw new HttpError(404, "Salon not found");
 
-  const buffer = await generateSalonQrCode(salonPublicUrl(tenant.slug));
+  const buffer = await generateSalonQrCard({
+    salonName: tenant.salonName,
+    logoUrl: tenant.logoUrl ? await storageProvider.resolveUrl(tenant.logoUrl) : null,
+    publicUrl: salonPublicUrl(tenant.slug),
+  });
   const key = `qrcodes/${req.tenantId}/profile.png`;
   await storageProvider.upload(key, buffer, "image/png");
   const imageUrl = await storageProvider.getSignedUrl(key);

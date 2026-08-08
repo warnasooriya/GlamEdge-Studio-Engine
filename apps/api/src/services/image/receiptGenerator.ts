@@ -1,5 +1,5 @@
-import axios from "axios";
 import sharp from "sharp";
+import { fetchImageDataUri } from "./fetchDataUri";
 
 export interface ReceiptLineItem {
   name: string;
@@ -39,19 +39,8 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function fetchLogoDataUri(logoUrl: string): Promise<string | null> {
-  try {
-    const res = await axios.get<ArrayBuffer>(logoUrl, { responseType: "arraybuffer", timeout: 5000 });
-    const contentType = (res.headers["content-type"] as string) || "image/png";
-    const base64 = Buffer.from(res.data).toString("base64");
-    return `data:${contentType};base64,${base64}`;
-  } catch {
-    return null;
-  }
-}
-
 export async function generateReceiptImage(data: ReceiptData): Promise<Buffer> {
-  const logoDataUri = data.logoUrl ? await fetchLogoDataUri(data.logoUrl) : null;
+  const logoDataUri = data.logoUrl ? await fetchImageDataUri(data.logoUrl) : null;
 
   // Lay out top-to-bottom with a running cursor so element gaps never overlap,
   // regardless of how many optional lines (address/contact/items) are present.

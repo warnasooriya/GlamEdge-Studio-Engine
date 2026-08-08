@@ -220,16 +220,18 @@ export default function SettingsPage() {
             <span className="font-medium text-plum-600 dark:text-cream-100">{publicProfileUrl}</span>.
           </p>
 
-          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-            <div className="flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-plum-100 bg-white dark:border-white/10">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+            <div className="w-48 shrink-0 overflow-hidden rounded-2xl border border-plum-100 bg-white shadow-sm dark:border-white/10">
               {qrLoading ? (
-                <span className="text-xs text-plum-400 dark:text-cream-100/50">Loading...</span>
+                <div className="flex aspect-[5/7] items-center justify-center">
+                  <span className="text-xs text-plum-400 dark:text-cream-100/50">Loading...</span>
+                </div>
               ) : qrCodeUrl ? (
-                <img src={qrCodeUrl} alt="Salon profile QR code" className="h-full w-full object-contain" />
+                <img src={qrCodeUrl} alt="Salon profile QR code" className="w-full" />
               ) : (
-                <span className="px-2 text-center text-xs text-plum-400 dark:text-cream-100/50">
+                <div className="flex aspect-[5/7] items-center justify-center px-2 text-center text-xs text-plum-400 dark:text-cream-100/50">
                   Couldn't load QR code
-                </span>
+                </div>
               )}
             </div>
 
@@ -253,6 +255,9 @@ export default function SettingsPage() {
                 <MessageCircle className="h-3.5 w-3.5" />
                 {shareQrCodeViaWhatsApp.isPending ? "Sending..." : "Send to my WhatsApp"}
               </Button>
+              <p className="max-w-56 text-xs text-plum-400 dark:text-cream-100/50">
+                This branded card is ready to post on social media or print for your counter.
+              </p>
             </div>
           </div>
         </CardContent>
