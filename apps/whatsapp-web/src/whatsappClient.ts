@@ -1,4 +1,4 @@
-import { existsSync, unlinkSync } from "fs";
+import { lstatSync, unlinkSync } from "fs";
 import { join } from "path";
 import { Client, LocalAuth, MessageMedia } from "whatsapp-web.js";
 import QRCode from "qrcode";
@@ -42,11 +42,28 @@ async function resolveChatId(phone: string): Promise<string> {
 // another Chromium process" — even though nothing is actually still running.
 // A fresh process starting up can never legitimately hold them itself, so
 // clearing them here is always safe.
+//
+// SingletonLock (and its siblings) are symlinks whose "target" is just a
+// `<hostname>-<pid>` string, not a real path — so once the container that
+// created them is gone, the target never resolves. fs.existsSync() follows
+// symlinks and reports `false` for exactly this dangling case, so it always
+// skipped the unlinkSync() below and the lock was never actually removed.
+// lstatSync() stats the link itself instead of its target, so it correctly
+// reports the (dangling) symlink as present.
+function pathExists(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function cleanStaleChromiumLocks() {
   const profileDir = join(config.sessionDataPath, "session");
   for (const name of ["SingletonLock", "SingletonCookie", "SingletonSocket"]) {
     const path = join(profileDir, name);
-    if (existsSync(path)) {
+    if (pathExists(path)) {
       try {
         unlinkSync(path);
         console.log(`[whatsapp-web] Removed stale ${name} from a previous unclean shutdown.`);

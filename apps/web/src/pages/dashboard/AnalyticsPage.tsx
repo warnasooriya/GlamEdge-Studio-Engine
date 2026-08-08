@@ -107,7 +107,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
         <StatTile label="Revenue" value={data ? formatCurrency(data.totals.revenue) : "—"} icon={TrendingUp} tone="brand" />
         <StatTile label="Bookings" value={data ? String(data.totals.bookings) : "—"} icon={CalendarClock} tone="emerald" />
         <StatTile
