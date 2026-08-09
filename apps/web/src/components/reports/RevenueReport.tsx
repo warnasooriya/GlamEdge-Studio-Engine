@@ -22,6 +22,7 @@ const PAYMENT_LABEL: Record<PaymentMode, string> = {
   CARD: "Card",
   ONLINE: "Online",
   LANKAQR: "LankaQR",
+  PAYPAL: "PayPal",
 };
 
 export function RevenueReport({ from, to }: { from: string; to: string }) {

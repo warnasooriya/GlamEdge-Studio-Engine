@@ -15,6 +15,7 @@ import FeedManagePage from "@/pages/dashboard/FeedManagePage";
 import SettingsPage from "@/pages/dashboard/SettingsPage";
 import POSPage from "@/pages/pos/POSPage";
 import SalonPublicPage from "@/pages/public/SalonPublicPage";
+import PublicPaymentPage from "@/pages/public/PublicPaymentPage";
 import LandingPage from "@/pages/public/LandingPage";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 import { AdminProtectedRoute } from "@/components/shared/AdminProtectedRoute";
@@ -42,6 +43,7 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={<OnboardingPage />} />
       <Route path="/salon/:slug" element={<SalonPublicPage />} />
+      <Route path="/pay/:paymentId" element={<PublicPaymentPage />} />
 
       <Route path="/account" element={<ClientLayout />}>
         <Route index element={<ClientDashboardHome />} />

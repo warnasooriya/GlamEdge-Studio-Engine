@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { Receipt, FileText, Image as ImageIcon } from "lucide-react";
+import { Receipt, FileText, Image as ImageIcon, Copy, MessageCircle, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/shared/Pagination";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { WalkInSaleForm } from "@/components/pos/WalkInSaleForm";
 import { useToast } from "@/components/ui/toast";
+import { getSocket } from "@/lib/socket";
 import { formatCurrency } from "@/lib/utils";
 import { Appointment, Invoice, PaymentMode } from "@/types";
 
@@ -29,11 +31,14 @@ interface AppointmentsResponse {
 }
 
 interface CreateInvoiceResponse {
-  invoiceUrl: string;
-  receiptImageUrl: string;
+  invoiceUrl?: string;
+  receiptImageUrl?: string;
   totalAmount: number;
   whatsappSent: boolean;
   hasPhone: boolean;
+  // Present instead of the receipt fields when paymentMode is PayPal — the
+  // bill isn't finalized yet, the customer still has to pay via the link.
+  payUrl?: string;
 }
 
 export default function POSPage() {
@@ -88,17 +93,27 @@ export default function POSPage() {
         })
       ).data,
     onSuccess: (data) => {
-      if (data.whatsappSent) {
-        toast(`Receipt sent via WhatsApp — ${formatCurrency(data.totalAmount)}`, "success");
-      } else if (!data.hasPhone) {
-        toast(`Billed ${formatCurrency(data.totalAmount)} — no phone on file, opening the receipt to share manually.`, "success");
+      if (data.payUrl) {
+        if (data.whatsappSent) {
+          toast(`PayPal payment link sent via WhatsApp — ${formatCurrency(data.totalAmount)}`, "success");
+        } else if (!data.hasPhone) {
+          toast(`Payment link created for ${formatCurrency(data.totalAmount)} — no phone on file, copy it to share manually.`, "success");
+        } else {
+          toast("Payment link created, but the WhatsApp send failed — copy it to share manually.", "error");
+        }
       } else {
-        toast(
-          `Billed ${formatCurrency(data.totalAmount)}, but the WhatsApp send failed — opening the receipt so you can share it manually.`,
-          "error"
-        );
+        if (data.whatsappSent) {
+          toast(`Receipt sent via WhatsApp — ${formatCurrency(data.totalAmount)}`, "success");
+        } else if (!data.hasPhone) {
+          toast(`Billed ${formatCurrency(data.totalAmount)} — no phone on file, opening the receipt to share manually.`, "success");
+        } else {
+          toast(
+            `Billed ${formatCurrency(data.totalAmount)}, but the WhatsApp send failed — opening the receipt so you can share it manually.`,
+            "error"
+          );
+        }
+        window.open(data.receiptImageUrl, "_blank");
       }
-      window.open(data.receiptImageUrl, "_blank");
       setPendingPage(1);
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
       queryClient.invalidateQueries({ queryKey: ["ledger"] });
@@ -106,6 +121,40 @@ export default function POSPage() {
     },
     onError: (err: any) => toast(err.response?.data?.error || "Billing failed", "error"),
   });
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const handlePaymentCaptured = () => {
+      toast("A customer just paid via PayPal", "success");
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["ledger"] });
+      queryClient.invalidateQueries({ queryKey: ["billing"] });
+    };
+    socket.on("payment:captured", handlePaymentCaptured);
+    return () => {
+      socket.off("payment:captured", handlePaymentCaptured);
+    };
+  }, [queryClient, toast]);
+
+  const cancelPaypalLink = useMutation({
+    mutationFn: async (id: string) => api.post(`/api/billing/appointments/${id}/paypal-link/cancel`),
+    onSuccess: () => {
+      toast("Payment link cancelled — you can bill this normally now", "success");
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+    },
+    onError: (err: any) => toast(err.response?.data?.error || "Failed to cancel payment link", "error"),
+  });
+
+  async function handleCopyPayLink(paymentId: string) {
+    const url = `${window.location.origin}/pay/${paymentId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("Payment link copied", "success");
+    } catch {
+      toast(url, "success");
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -124,6 +173,7 @@ export default function POSPage() {
           {billable.length ? (
             billable.map((appt) => {
               const total = appt.services.reduce((sum, s) => sum + Number(s.price), 0);
+              const pendingPaypal = appt.paypalPayment?.status === "PENDING" ? appt.paypalPayment : null;
               return (
                 <div key={appt.id} className="flex flex-wrap items-center justify-between gap-2 py-3.5 text-sm">
                   <div>
@@ -136,23 +186,47 @@ export default function POSPage() {
                       <span className="font-semibold text-brand-600 dark:text-brand-300">{formatCurrency(total)}</span>
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <select
-                      className="h-9 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"
-                      value={paymentModeByAppt[appt.id] || "CASH"}
-                      onChange={(e) =>
-                        setPaymentModeByAppt((prev) => ({ ...prev, [appt.id]: e.target.value as PaymentMode }))
-                      }
-                    >
-                      <option value="CASH">Cash</option>
-                      <option value="CARD">Card</option>
-                      <option value="ONLINE">Online</option>
-                      <option value="LANKAQR">LankaQR</option>
-                    </select>
-                    <Button size="sm" variant="gold" onClick={() => createInvoice.mutate(appt.id)} disabled={createInvoice.isPending}>
-                      Bill & Send
-                    </Button>
-                  </div>
+                  {pendingPaypal ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="amber">Awaiting PayPal payment</Badge>
+                      <Button size="sm" variant="outline" onClick={() => handleCopyPayLink(pendingPaypal.id)}>
+                        <Copy className="h-3.5 w-3.5" /> Copy link
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => cancelPaypalLink.mutate(appt.id)}
+                        disabled={cancelPaypalLink.isPending}
+                      >
+                        <X className="h-3.5 w-3.5" /> Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <select
+                        className="h-9 rounded-lg border border-plum-100 bg-white/90 px-2.5 text-sm shadow-sm dark:border-white/10 dark:bg-plum-700/60 dark:text-cream-50"
+                        value={paymentModeByAppt[appt.id] || "CASH"}
+                        onChange={(e) =>
+                          setPaymentModeByAppt((prev) => ({ ...prev, [appt.id]: e.target.value as PaymentMode }))
+                        }
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="CARD">Card</option>
+                        <option value="ONLINE">Online</option>
+                        <option value="LANKAQR">LankaQR</option>
+                        <option value="PAYPAL">PayPal</option>
+                      </select>
+                      <Button size="sm" variant="gold" onClick={() => createInvoice.mutate(appt.id)} disabled={createInvoice.isPending}>
+                        {paymentModeByAppt[appt.id] === "PAYPAL" ? (
+                          <>
+                            <MessageCircle className="h-3.5 w-3.5" /> Send Pay Link
+                          </>
+                        ) : (
+                          "Bill & Send"
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               );
             })

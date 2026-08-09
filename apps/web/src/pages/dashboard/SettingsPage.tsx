@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Store, Upload, Clock, QrCode, Download, MessageCircle } from "lucide-react";
+import { Store, Upload, Clock, QrCode, Download, MessageCircle, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ export default function SettingsPage() {
   const [latitude, setLatitude] = useState<number | null>(tenant?.latitude ?? null);
   const [longitude, setLongitude] = useState<number | null>(tenant?.longitude ?? null);
   const [contactPhone, setContactPhone] = useState(tenant?.contactPhone || "");
+  const [paypalEmail, setPaypalEmail] = useState(tenant?.paypalEmail || "");
   const [openTime, setOpenTime] = useState(tenant?.openTime || "09:00");
   const [closeTime, setCloseTime] = useState(tenant?.closeTime || "20:00");
   const [workingDays, setWorkingDays] = useState<number[]>(tenant?.workingDays?.length ? tenant.workingDays : [0, 1, 2, 3, 4, 5, 6]);
@@ -109,6 +110,7 @@ export default function SettingsPage() {
       api.patch<{ tenant: Tenant }>("/api/tenants/me", {
         address,
         contactPhone,
+        paypalEmail,
         openTime,
         closeTime,
         workingDays,
@@ -125,6 +127,10 @@ export default function SettingsPage() {
     }
     if (openTime >= closeTime) {
       toast("Opening time must be before closing time", "error");
+      return;
+    }
+    if (paypalEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paypalEmail)) {
+      toast("Enter a valid PayPal email, or leave it blank", "error");
       return;
     }
     try {
@@ -204,6 +210,31 @@ export default function SettingsPage() {
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-brand-500" /> Payments
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-plum-400 dark:text-cream-100/50">
+              PayPal email for receiving payments
+            </label>
+            <Input
+              type="email"
+              placeholder="yoursalon@example.com"
+              value={paypalEmail}
+              onChange={(e) => setPaypalEmail(e.target.value)}
+            />
+            <p className="text-xs text-plum-400 dark:text-cream-100/60">
+              Customers pay directly into this account when you send them a bill online — just your PayPal
+              email, no approval process needed. Leave blank to disable online payments.
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -67,6 +67,15 @@ export const env = {
     email: optional("ADMIN_EMAIL", "admin@glamedge.dev"),
     password: optional("ADMIN_PASSWORD", ""),
   },
+
+  paypal: {
+    clientId: optional("PAYPAL_CLIENT_ID"),
+    clientSecret: optional("PAYPAL_CLIENT_SECRET"),
+    mode: optional("PAYPAL_MODE", "sandbox"),
+    // Used only if the live FX lookup (services/fx/exchangeRateService.ts) fails —
+    // checkout must never hard-fail just because a third-party rate API hiccuped.
+    fallbackLkrPerUsd: Number(optional("PAYPAL_FALLBACK_LKR_PER_USD", "300")),
+  },
 };
 
 export const isS3Configured = Boolean(
@@ -75,5 +84,9 @@ export const isS3Configured = Boolean(
 
 export const isWhatsAppConfigured = Boolean(env.whatsapp.token && env.whatsapp.phoneNumberId);
 export const isWhatsAppWebConfigured = Boolean(env.whatsappWeb.internalSecret);
+
+export const isPayPalConfigured = Boolean(env.paypal.clientId && env.paypal.clientSecret);
+export const paypalApiBase =
+  env.paypal.mode === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
 
 export { required };

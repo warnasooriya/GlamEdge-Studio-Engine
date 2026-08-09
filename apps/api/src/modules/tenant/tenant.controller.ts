@@ -93,6 +93,7 @@ const updateTenantSchema = z.object({
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
   contactPhone: z.string().max(50).optional(),
+  paypalEmail: z.union([z.literal(""), z.string().trim().max(191).email("Enter a valid email")]).optional(),
   openTime: z.string().regex(TIME_RE, "Use HH:MM, e.g. 09:00").optional(),
   closeTime: z.string().regex(TIME_RE, "Use HH:MM, e.g. 20:00").optional(),
   workingDays: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional(),

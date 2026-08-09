@@ -67,7 +67,10 @@ export async function listAppointments(req: AuthRequest, res: Response) {
   const [appointments, total] = await Promise.all([
     prisma.appointment.findMany({
       where,
-      include: APPOINTMENT_INCLUDE,
+      // paypalPayment is only needed here (the POS unbilled list) so staff can
+      // see when an appointment already has a pending pay-link — other call
+      // sites reuse the shared APPOINTMENT_INCLUDE without it.
+      include: { ...APPOINTMENT_INCLUDE, paypalPayment: true },
       orderBy: { bookingTime: "asc" },
       skip,
       take,

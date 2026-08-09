@@ -43,6 +43,13 @@ enum PaymentMode {
   CARD
   ONLINE
   LANKAQR
+  PAYPAL
+}
+
+enum PaypalPaymentStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
 }
 
 enum AppointmentStatus {
@@ -94,6 +101,10 @@ model Tenant {
   latitude              Float?
   longitude             Float?
   contactPhone          String?            @db.VarChar(50)
+  // Where PayPal sends customer payments — the platform's own PayPal REST
+  // app creates each order with this as payee.email_address, so funds route
+  // straight to the salon with no PayPal Partner/OAuth approval needed.
+  paypalEmail           String?            @db.VarChar(191)
   // Both null = not configured yet, and every existing behavior (9am-8pm,
   // every day) stays exactly as it was before this feature — see
   // apps/api/src/utils/businessHours.ts for the fallback.
@@ -111,6 +122,7 @@ model Tenant {
   notifications        Notification[]
   ownerNotifications   OwnerNotification[]
   subscriptionPayments SubscriptionPayment[]
+  paypalPayments       PaypalPayment[]
 
   @@map("tenants")
 }
@@ -172,9 +184,10 @@ model Appointment {
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 
-  services AppointmentService[]
-  ledger   Ledger?
-  review   Review?
+  services      AppointmentService[]
+  ledger        Ledger?
+  review        Review?
+  paypalPayment PaypalPayment?
 
   @@index([tenantId])
   @@index([bookingTime])
@@ -254,6 +267,32 @@ model Ledger {
   @@index([tenantId])
   @@index([createdAt])
   @@map("ledgers")
+}
+
+// A "Pay Now" link generated at billing time: the customer completes payment
+// remotely (see apps/api/src/modules/payments), and only then does the
+// appointment get finalized the same way a cash sale is — see
+// billing.service.ts finalizeInvoice(). amountUsd/fxRate are recorded at the
+// moment checkout actually happens (not link-creation time) since PayPal
+// doesn't settle in LKR and rates drift while a link sits unpaid.
+model PaypalPayment {
+  id              String              @id @default(uuid())
+  tenantId        String
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointmentId   String              @unique
+  appointment     Appointment         @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  amountLkr       Decimal             @db.Decimal(10, 2)
+  amountUsd       Decimal?            @db.Decimal(10, 2)
+  fxRate          Decimal?            @db.Decimal(10, 4)
+  status          PaypalPaymentStatus @default(PENDING)
+  paypalOrderId   String?             @db.VarChar(64)
+  paypalCaptureId String?             @db.VarChar(64)
+  payerEmail      String?             @db.VarChar(191)
+  createdAt       DateTime            @default(now())
+  completedAt     DateTime?
+
+  @@index([tenantId])
+  @@map("paypal_payments")
 }
 
 model Review {

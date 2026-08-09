@@ -2,119 +2,86 @@ import { Response } from "express";
 import { prisma } from "@/config/prisma";
 import { AuthRequest } from "@/middlewares/requireAuth";
 import { HttpError } from "@/middlewares/errorHandler";
-import { generateInvoicePdf } from "@/services/pdf/invoiceGenerator";
-import { generateReceiptImage } from "@/services/image/receiptGenerator";
 import { storageProvider } from "@/services/storage";
-import { sendWhatsAppInvoice } from "@/services/whatsapp/whatsappService";
-import { createNotification } from "@/services/notifications/notificationService";
+import { sendWhatsAppText } from "@/services/whatsapp/whatsappService";
 import { parsePagination, paginationMeta } from "@/utils/pagination";
+import { env } from "@/config/env";
 import { createInvoiceSchema } from "./billing.schema";
+import { appointmentBillingInclude, finalizeInvoice } from "./billing.service";
 
 export async function createInvoice(req: AuthRequest, res: Response) {
   const { paymentMode } = createInvoiceSchema.parse(req.body);
 
   const appointment = await prisma.appointment.findFirst({
     where: { id: req.params.appointmentId, tenantId: req.tenantId! },
-    include: { services: { include: { service: true } }, tenant: true },
+    include: appointmentBillingInclude,
   });
   if (!appointment) throw new HttpError(404, "Appointment not found");
   if (appointment.isBilled) throw new HttpError(400, "Appointment has already been billed");
 
-  const items = appointment.services.map((s) => ({ name: s.service.name, price: Number(s.price) }));
-  const totalAmount = items.reduce((sum, i) => sum + i.price, 0);
-
-  const pdfBuffer = await generateInvoicePdf({
-    invoiceNumber: appointment.id.slice(0, 8).toUpperCase(),
-    salonName: appointment.tenant.salonName,
-    clientName: appointment.clientName,
-    clientPhone: appointment.clientPhone,
-    items,
-    paymentMode,
-    issuedAt: new Date(),
-  });
-
-  await storageProvider.upload(`invoices/${appointment.tenantId}/${appointment.id}.pdf`, pdfBuffer, "application/pdf");
-
-  const receiptBuffer = await generateReceiptImage({
-    salonName: appointment.tenant.salonName,
-    logoUrl: appointment.tenant.logoUrl ? await storageProvider.resolveUrl(appointment.tenant.logoUrl) : null,
-    address: appointment.tenant.address,
-    contactPhone: appointment.tenant.contactPhone,
-    clientName: appointment.clientName,
-    items,
-    total: totalAmount,
-    paymentMode,
-    issuedAt: new Date(),
-  });
-
-  await storageProvider.upload(`receipts/${appointment.tenantId}/${appointment.id}.png`, receiptBuffer, "image/png");
-
-  const [signedInvoiceUrl, signedReceiptUrl] = await Promise.all([
-    storageProvider.getSignedUrl(`invoices/${appointment.tenantId}/${appointment.id}.pdf`),
-    storageProvider.getSignedUrl(`receipts/${appointment.tenantId}/${appointment.id}.png`),
-  ]);
-
-  const [, ledgerEntry] = await prisma.$transaction([
-    prisma.appointment.update({
-      where: { id: appointment.id },
-      data: { isBilled: true, status: "COMPLETED" },
-    }),
-    prisma.ledger.create({
-      data: {
-        tenantId: appointment.tenantId,
-        appointmentId: appointment.id,
-        type: "INCOME",
-        amount: totalAmount,
-        category: "service_sale",
-        paymentMode,
-        description: `Invoice for ${appointment.clientName}`,
-      },
-    }),
-  ]);
-
-  let whatsappSent = false;
-  if (appointment.clientPhone) {
-    try {
-      await sendWhatsAppInvoice({
-        clientPhone: appointment.clientPhone,
-        clientName: appointment.clientName,
-        salonName: appointment.tenant.salonName,
-        totalAmount: totalAmount.toFixed(2),
-        pdfInvoiceUrl: signedInvoiceUrl,
-        receiptImageUrl: signedReceiptUrl,
-      });
-      whatsappSent = true;
-    } catch (err) {
-      // Invoice + ledger already committed; a WhatsApp delivery failure shouldn't fail billing.
-      // The caller still needs to know it failed, though — never silently claim it was sent.
-      console.error("WhatsApp invoice dispatch failed:", err);
+  if (paymentMode === "PAYPAL") {
+    const existingLink = await prisma.paypalPayment.findUnique({ where: { appointmentId: appointment.id } });
+    if (existingLink && existingLink.status !== "CANCELLED") {
+      throw new HttpError(400, "A PayPal payment link already exists for this appointment");
     }
+
+    const totalAmount = appointment.services.reduce((sum, s) => sum + Number(s.price), 0);
+
+    const paypalPayment = existingLink
+      ? await prisma.paypalPayment.update({
+          where: { id: existingLink.id },
+          data: { status: "PENDING", amountLkr: totalAmount, paypalOrderId: null, paypalCaptureId: null },
+        })
+      : await prisma.paypalPayment.create({
+          data: { tenantId: appointment.tenantId, appointmentId: appointment.id, amountLkr: totalAmount },
+        });
+
+    const payUrl = `${env.frontendUrl}/pay/${paypalPayment.id}`;
+
+    let whatsappSent = false;
+    if (appointment.clientPhone) {
+      try {
+        await sendWhatsAppText(
+          appointment.clientPhone,
+          `${appointment.tenant.salonName}: your bill of LKR ${totalAmount.toFixed(2)} is ready. Pay securely via PayPal here: ${payUrl}`
+        );
+        whatsappSent = true;
+      } catch (err) {
+        console.error("WhatsApp pay-link dispatch failed:", err);
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      paypalPaymentId: paypalPayment.id,
+      payUrl,
+      totalAmount,
+      whatsappSent,
+      hasPhone: Boolean(appointment.clientPhone),
+    });
   }
 
-  if (appointment.clientId) {
-    try {
-      await createNotification({
-        clientId: appointment.clientId,
-        tenantId: appointment.tenantId,
-        appointmentId: appointment.id,
-        type: "INVOICE_READY",
-        title: "Your receipt is ready",
-        message: `Your receipt from ${appointment.tenant.salonName} for LKR ${totalAmount.toFixed(2)} is ready.`,
-      });
-    } catch (err) {
-      console.error("Notification create failed:", err);
-    }
+  const result = await finalizeInvoice(appointment, paymentMode);
+  return res.status(201).json({ success: true, ...result });
+}
+
+export async function cancelPaypalLink(req: AuthRequest, res: Response) {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: req.params.appointmentId, tenantId: req.tenantId! },
+    include: { paypalPayment: true },
+  });
+  if (!appointment) throw new HttpError(404, "Appointment not found");
+  if (!appointment.paypalPayment) throw new HttpError(404, "No PayPal payment link exists for this appointment");
+  if (appointment.paypalPayment.status === "COMPLETED") {
+    throw new HttpError(400, "This payment has already been completed and can't be cancelled");
   }
 
-  return res.status(201).json({
-    success: true,
-    invoiceUrl: signedInvoiceUrl,
-    receiptImageUrl: signedReceiptUrl,
-    totalAmount,
-    whatsappSent,
-    hasPhone: Boolean(appointment.clientPhone),
-    ledgerEntry,
+  await prisma.paypalPayment.update({
+    where: { id: appointment.paypalPayment.id },
+    data: { status: "CANCELLED" },
   });
+
+  return res.json({ success: true });
 }
 
 export async function listInvoices(req: AuthRequest, res: Response) {

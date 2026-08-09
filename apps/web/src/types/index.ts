@@ -1,7 +1,8 @@
 export type CategoryType = "LADIES" | "GENTS" | "KIDS";
 export type AppointmentStatus = "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
 export type RescheduleStatus = "NONE" | "PROPOSED";
-export type PaymentMode = "CASH" | "CARD" | "ONLINE" | "LANKAQR";
+export type PaymentMode = "CASH" | "CARD" | "ONLINE" | "LANKAQR" | "PAYPAL";
+export type PaypalPaymentStatus = "PENDING" | "COMPLETED" | "CANCELLED";
 export type LedgerType = "INCOME" | "EXPENSE";
 export type TenantStatus = "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
 export type SubscriptionCycle = "MONTHLY" | "YEARLY";
@@ -20,6 +21,7 @@ export interface Tenant {
   latitude?: number | null;
   longitude?: number | null;
   contactPhone?: string | null;
+  paypalEmail?: string | null;
   openTime?: string | null;
   closeTime?: string | null;
   workingDays?: number[] | null;
@@ -100,6 +102,7 @@ export interface Appointment {
   proposedStaff?: Staff | null;
   services: { serviceId: string; price: string; service: Service }[];
   review?: Review | null;
+  paypalPayment?: { id: string; status: PaypalPaymentStatus } | null;
 }
 
 export interface LedgerEntry {
