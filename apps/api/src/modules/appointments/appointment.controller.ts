@@ -156,16 +156,26 @@ export async function createPublicAppointment(req: ClientAuthRequest, res: Respo
     }
   }
 
+  const ownerMessage = `${appointment.clientName} requested ${serviceNames} on ${appointment.bookingTime.toLocaleString()}`;
+
   try {
     await createOwnerNotification({
       tenantId: tenant.id,
       appointmentId: appointment.id,
       type: "BOOKING_REQUESTED",
       title: "New booking request",
-      message: `${appointment.clientName} requested ${serviceNames} on ${appointment.bookingTime.toLocaleString()}`,
+      message: ownerMessage,
     });
   } catch (err) {
     console.error("Owner notification create failed:", err);
+  }
+
+  try {
+    await sendWhatsAppText(tenant.phone, `New booking request 💇 ${ownerMessage}. Open your dashboard to confirm.`);
+  } catch (err) {
+    // In-app notification above already landed; a WhatsApp delivery failure
+    // shouldn't fail the booking itself.
+    console.error("WhatsApp owner-notify dispatch failed:", err);
   }
 
   return res.status(201).json({ success: true, appointment });
