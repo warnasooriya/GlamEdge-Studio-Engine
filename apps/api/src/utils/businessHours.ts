@@ -24,13 +24,25 @@ function minutesSinceMidnight(hhmm: string): number {
   return h * 60 + m;
 }
 
+// bookingTime is stored as a UTC instant; salons on this platform operate in Sri
+// Lanka (+05:30) regardless of what timezone the server process itself runs in.
+// date.getDay()/getHours() reflect the server's local TZ (often UTC in
+// containers), so they'd silently check business hours against the wrong clock
+// unless the deploy environment happens to be set to Asia/Colombo. Shifting by
+// this fixed offset and reading back with UTC getters keeps the check correct
+// no matter what TZ the server runs in. Matches analytics.controller.ts's
+// SL_OFFSET_MINUTES convention.
+const SL_OFFSET_MINUTES = 330;
+
 export function isWithinBusinessHours(tenant: BusinessHoursTenant, date: Date): boolean {
   const openTime = tenant.openTime || DEFAULT_OPEN_TIME;
   const closeTime = tenant.closeTime || DEFAULT_CLOSE_TIME;
   const workingDays = parseWorkingDays(tenant.workingDays);
 
-  if (!workingDays.includes(date.getDay())) return false;
+  const sl = new Date(date.getTime() + SL_OFFSET_MINUTES * 60000);
 
-  const minutes = date.getHours() * 60 + date.getMinutes();
+  if (!workingDays.includes(sl.getUTCDay())) return false;
+
+  const minutes = sl.getUTCHours() * 60 + sl.getUTCMinutes();
   return minutes >= minutesSinceMidnight(openTime) && minutes < minutesSinceMidnight(closeTime);
 }

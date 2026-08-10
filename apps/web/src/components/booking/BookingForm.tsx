@@ -10,7 +10,13 @@ import { useToast } from "@/components/ui/toast";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
 import { clientLogout } from "@/store/clientAuthSlice";
 import { formatCurrency, cn } from "@/lib/utils";
-import { DEFAULT_WORKING_DAYS, generateTimeSlots, isWorkingDay, toLocalDateStr } from "@/lib/timeSlots";
+import {
+  DEFAULT_WORKING_DAYS,
+  generateTimeSlots,
+  isWorkingDay,
+  slDateTimeToUtcISOString,
+  toSriLankaDateStr,
+} from "@/lib/timeSlots";
 import { CategoryType, Service, Staff } from "@/types";
 
 interface Props {
@@ -49,7 +55,7 @@ export function BookingForm({ slug, services, staff, openTime, closeTime, workin
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
 
   const effectiveWorkingDays = workingDays?.length ? workingDays : DEFAULT_WORKING_DAYS;
-  const today = toLocalDateStr(new Date());
+  const today = toSriLankaDateStr(new Date());
   const dateIsOpen = useMemo(() => isWorkingDay(date, effectiveWorkingDays), [date, effectiveWorkingDays]);
   const timeSlots = useMemo(
     () => (dateIsOpen ? generateTimeSlots(date, new Date(), openTime ?? undefined, closeTime ?? undefined) : []),
@@ -71,7 +77,7 @@ export function BookingForm({ slug, services, staff, openTime, closeTime, workin
         clientName,
         category,
         staffId: staffId || undefined,
-        bookingTime: new Date(`${date}T${time}`).toISOString(),
+        bookingTime: slDateTimeToUtcISOString(date, time),
         serviceIds: selectedServiceIds,
       }),
     onSuccess: (res) => {

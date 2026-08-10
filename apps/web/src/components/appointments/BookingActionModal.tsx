@@ -9,6 +9,7 @@ import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { useToast } from "@/components/ui/toast";
 import { STATUS_VARIANT, NEXT_STATUS } from "@/components/appointments/AppointmentRow";
 import { BookingChatThread } from "@/components/appointments/BookingChatThread";
+import { slDateTimeToUtcISOString } from "@/lib/timeSlots";
 import { cn } from "@/lib/utils";
 import { Appointment, AppointmentStatus, OwnerNotification, Staff } from "@/types";
 
@@ -71,7 +72,9 @@ export function BookingActionModal({ appointmentId, open, onOpenChange }: Props)
   const proposeReschedule = useMutation({
     mutationFn: async () =>
       api.patch(`/api/appointments/${appointmentId}/reschedule`, {
-        proposedBookingTime: proposedTime ? new Date(proposedTime).toISOString() : undefined,
+        proposedBookingTime: proposedTime
+          ? slDateTimeToUtcISOString(...(proposedTime.split("T") as [string, string]))
+          : undefined,
         proposedStaffId: proposedStaffId || undefined,
       }),
     onSuccess: () => {

@@ -6,8 +6,28 @@ export const DEFAULT_WORKING_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 const SLOT_MINUTES = 30;
 
-export function toLocalDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+// Salons on this platform always operate in Sri Lanka time (+05:30), regardless
+// of the booking device's own timezone — matches apps/api's SL_OFFSET_MINUTES
+// convention (see businessHours.ts and analytics.controller.ts).
+const SL_OFFSET_MINUTES = 330;
+
+function toSriLankaWallClock(d: Date): Date {
+  return new Date(d.getTime() + SL_OFFSET_MINUTES * 60000);
+}
+
+export function toSriLankaDateStr(d: Date): string {
+  const sl = toSriLankaWallClock(d);
+  return `${sl.getUTCFullYear()}-${String(sl.getUTCMonth() + 1).padStart(2, "0")}-${String(sl.getUTCDate()).padStart(2, "0")}`;
+}
+
+// Builds the UTC instant for a Sri Lanka wall-clock date + time, independent of
+// the booking device's own timezone — a client or staff member on a device set
+// to a different zone must not shift the actual salon-local slot they picked.
+export function slDateTimeToUtcISOString(dateStr: string, timeStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [h, min] = timeStr.split(":").map(Number);
+  const utcMs = Date.UTC(y, m - 1, d, h, min) - SL_OFFSET_MINUTES * 60000;
+  return new Date(utcMs).toISOString();
 }
 
 function toMinutes(hhmm: string): number {
@@ -38,7 +58,9 @@ export function generateTimeSlots(
     slots.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
   }
 
-  if (dateStr !== toLocalDateStr(now)) return slots;
+  if (dateStr !== toSriLankaDateStr(now)) return slots;
 
-  return slots.filter((slot) => new Date(`${dateStr}T${slot}:00`) > now);
+  const sl = toSriLankaWallClock(now);
+  const nowSlMinutes = sl.getUTCHours() * 60 + sl.getUTCMinutes();
+  return slots.filter((slot) => toMinutes(slot) > nowSlMinutes);
 }
