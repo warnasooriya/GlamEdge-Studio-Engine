@@ -123,6 +123,7 @@ model Tenant {
   ownerNotifications   OwnerNotification[]
   subscriptionPayments SubscriptionPayment[]
   paypalPayments       PaypalPayment[]
+  ownerPushTokens      OwnerPushToken[]
 
   @@map("tenants")
 }
@@ -238,6 +239,26 @@ model OwnerNotification {
 
   @@index([tenantId])
   @@map("owner_notifications")
+}
+
+enum PushPlatform {
+  IOS
+  ANDROID
+}
+
+// One row per device (not per owner) — an owner may be logged in on more than
+// one phone, and each device's Expo push token must be notified independently.
+model OwnerPushToken {
+  id        String       @id @default(uuid())
+  tenantId  String
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  token     String       @unique @db.VarChar(255)
+  platform  PushPlatform
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([tenantId])
+  @@map("owner_push_tokens")
 }
 
 model AppointmentService {

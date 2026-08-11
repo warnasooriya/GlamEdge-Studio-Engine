@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "GlamEdge Owner",
+    "slug": "glamedge-owner",
+    "scheme": "glamedge-owner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "beauty.glamedge.owner",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "beauty.glamedge.owner",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#ad1454",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBjmDhbFdX8o0NsoIbqHbiuzvcgdWxIN0w"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "themeColor": "#831049"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#43223d"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow GlamEdge Owner to use your location to pin your salon's exact position on the map."
+        }
+      ]
+    ]
+  }
+}

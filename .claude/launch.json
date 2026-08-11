@@ -12,6 +12,21 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "web", "dev"],
       "port": 5173
+    },
+    {
+      "name": "mobile-web",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PATH=/Users/ravendra/.nvm/versions/node/v20.20.2/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        "pnpm",
+        "--filter",
+        "mobile",
+        "exec",
+        "expo",
+        "start",
+        "--web"
+      ],
+      "port": 8081
     }
   ]
 }

@@ -5,6 +5,7 @@
   "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "concurrently -n api,web -c blue,magenta \"pnpm --filter api dev\" \"pnpm --filter web dev\"",
+    "dev:mobile": "pnpm --filter mobile start",
     "build": "pnpm --filter api build && pnpm --filter web build",
     "lint": "pnpm --filter api lint && pnpm --filter web lint",
     "db:migrate": "pnpm --filter api exec prisma migrate dev",

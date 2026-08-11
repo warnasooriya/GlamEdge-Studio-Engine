@@ -42,3 +42,18 @@ export async function markAllOwnerNotificationsRead(req: AuthRequest, res: Respo
   await prisma.ownerNotification.updateMany({ where: { tenantId, isRead: false }, data: { isRead: true } });
   return res.json({ success: true });
 }
+
+export async function deleteOwnerNotification(req: AuthRequest, res: Response) {
+  const tenantId = req.tenantId!;
+  const existing = await prisma.ownerNotification.findFirst({ where: { id: req.params.id, tenantId } });
+  if (!existing) throw new HttpError(404, "Notification not found");
+
+  await prisma.ownerNotification.delete({ where: { id: existing.id } });
+  return res.json({ success: true });
+}
+
+export async function clearOwnerNotifications(req: AuthRequest, res: Response) {
+  const tenantId = req.tenantId!;
+  await prisma.ownerNotification.deleteMany({ where: { tenantId } });
+  return res.json({ success: true });
+}
