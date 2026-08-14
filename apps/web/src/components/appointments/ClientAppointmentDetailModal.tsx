@@ -1,9 +1,11 @@
+import { useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X, CalendarClock } from "lucide-react";
+import { X, CalendarClock, Star } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clientApi } from "@/lib/clientApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { useToast } from "@/components/ui/toast";
 import { STATUS_VARIANT } from "@/components/appointments/AppointmentRow";
@@ -19,6 +21,8 @@ interface Props {
 export function ClientAppointmentDetailModal({ appointmentId, open, onOpenChange }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
 
   const { data } = useQuery({
     queryKey: ["client", "appointment", appointmentId],
@@ -38,6 +42,18 @@ export function ClientAppointmentDetailModal({ appointmentId, open, onOpenChange
       queryClient.invalidateQueries({ queryKey: ["client", "appointment", appointmentId] });
     },
     onError: (err: any) => toast(err.response?.data?.error || "Failed to respond", "error"),
+  });
+
+  const submitReview = useMutation({
+    mutationFn: async () =>
+      clientApi.post(`/api/appointments/${appointmentId}/review`, { rating, comment: comment || undefined }),
+    onSuccess: () => {
+      toast("Thanks for your review!", "success");
+      queryClient.invalidateQueries({ queryKey: ["client", "appointment", appointmentId] });
+      queryClient.invalidateQueries({ queryKey: ["client", "appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["client", "pending-reviews"] });
+    },
+    onError: (err: any) => toast(err.response?.data?.error || "Failed to submit review", "error"),
   });
 
   return (
@@ -96,6 +112,62 @@ export function ClientAppointmentDetailModal({ appointmentId, open, onOpenChange
                       Decline
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {appointment.status === "COMPLETED" && (
+                <div className="flex flex-col gap-2 rounded-lg border border-plum-100 p-3 dark:border-white/10">
+                  <p className="text-sm font-medium text-plum-700 dark:text-cream-50">Your review</p>
+                  {appointment.review ? (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <Star
+                            key={n}
+                            className={`h-4 w-4 ${
+                              n <= appointment.review!.rating
+                                ? "fill-amber-400 text-amber-400"
+                                : "text-plum-100 dark:text-white/15"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      {appointment.review.comment && (
+                        <p className="text-sm text-plum-600 dark:text-cream-100/80">{appointment.review.comment}</p>
+                      )}
+                    </div>
+                  ) : appointment.isBilled ? (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button key={n} onClick={() => setRating(n)}>
+                            <Star
+                              className={`h-6 w-6 transition-colors ${
+                                n <= rating ? "fill-amber-400 text-amber-400" : "text-plum-100 dark:text-white/15"
+                              }`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                      <Textarea
+                        placeholder="Tell us about your experience (optional)"
+                        value={comment}
+                        onChange={(e) => setComment(e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        className="self-start"
+                        disabled={submitReview.isPending}
+                        onClick={() => submitReview.mutate()}
+                      >
+                        Submit review
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-plum-400 dark:text-cream-100/50">
+                      Reviews open up once this visit has been billed.
+                    </p>
+                  )}
                 </div>
               )}
 

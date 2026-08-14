@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { verifyOtp } from "@/api/auth";
 import { useAppDispatch } from "@/hooks/redux";
 import { setAuth } from "@/store/authSlice";
-import { registerForPushNotifications } from "@/lib/push";
 import { AuthShell } from "@/components/AuthShell";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
@@ -46,7 +45,6 @@ export default function OtpScreen() {
       }
       if (result.token && result.tenant) {
         dispatch(setAuth({ token: result.token, tenant: result.tenant }));
-        registerForPushNotifications().catch(() => {});
         router.replace("/(app)");
       }
     } catch (err: any) {

@@ -143,7 +143,7 @@ export default function ClientLayout() {
                   key={item.to}
                   to={item.to}
                   end={item.end}
-                  className={({ isActive }) =>
+                  className={({ isActive }: { isActive: boolean }) =>
                     cn(
                       "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                       isActive

@@ -1,8 +1,16 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ComponentType } from "react";
 import { GoogleMap, Autocomplete, useJsApiLoader } from "@react-google-maps/api";
+import type { AutocompleteProps, GoogleMapProps } from "@react-google-maps/api";
 import { MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+
+// @react-google-maps/api's class components predate @types/react's stricter
+// JSX.ElementClass checks and no longer satisfy them directly — recast as
+// plain function-component types rather than pin an older, less secure
+// @types/react just for these two elements.
+const AutocompleteField = Autocomplete as unknown as ComponentType<AutocompleteProps>;
+const MapField = GoogleMap as unknown as ComponentType<GoogleMapProps>;
 
 const LIBRARIES: "places"[] = ["places"];
 const MAP_CONTAINER_STYLE = { width: "100%", height: "280px", borderRadius: "0.75rem" };
@@ -69,12 +77,12 @@ export function LocationPicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <Autocomplete onLoad={(a) => (autocompleteRef.current = a)} onPlaceChanged={handlePlaceChanged}>
+      <AutocompleteField onLoad={(a) => (autocompleteRef.current = a)} onPlaceChanged={handlePlaceChanged}>
         <Input placeholder="Search for your salon's address..." />
-      </Autocomplete>
+      </AutocompleteField>
 
       <div className="relative overflow-hidden rounded-xl">
-        <GoogleMap
+        <MapField
           mapContainerStyle={MAP_CONTAINER_STYLE}
           center={pinCenter}
           zoom={hasSelection ? 16 : 12}

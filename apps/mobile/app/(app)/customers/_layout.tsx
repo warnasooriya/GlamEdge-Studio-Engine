@@ -7,7 +7,7 @@ export default function CustomersLayout() {
     <Stack screenOptions={gradientHeaderScreenOptions}>
       <Stack.Screen
         name="index"
-        options={{ title: "Customers", headerLeft: () => <DrawerToggleButton tintColor="#fffaf5" /> }}
+        options={{ title: "Customers", headerLeft: () => <DrawerToggleButton tintColor="#fffaf5" pressOpacity={1} /> }}
       />
       <Stack.Screen name="[id]" options={{ title: "Customer" }} />
     </Stack>

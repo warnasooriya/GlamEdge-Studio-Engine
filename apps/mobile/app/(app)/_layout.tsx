@@ -3,6 +3,7 @@ import { Drawer } from "expo-router/drawer";
 import { Redirect } from "expo-router";
 import { useAppSelector } from "@/hooks/redux";
 import { connectSocket, disconnectSocket } from "@/lib/socket";
+import { registerForPushNotifications } from "@/lib/push";
 import { gradientHeaderScreenOptions } from "@/lib/navHeader";
 import { CustomDrawerContent } from "@/components/CustomDrawerContent";
 import { HeaderBrand } from "@/components/HeaderBrand";
@@ -16,6 +17,14 @@ export default function AppLayout() {
     connectSocket(tenant.id);
     return () => disconnectSocket();
   }, [tenant?.id]);
+
+  // Registers on every app entry with a live session — not just right after OTP —
+  // so a token restored from a prior session (cold start, reinstall, token rotation)
+  // still gets (re-)registered instead of leaving the owner with silent zero pushes.
+  useEffect(() => {
+    if (!token || !tenant?.id) return;
+    registerForPushNotifications().catch(() => {});
+  }, [token, tenant?.id]);
 
   if (!token || tenant?.status !== "APPROVED") {
     return <Redirect href="/(auth)/phone" />;

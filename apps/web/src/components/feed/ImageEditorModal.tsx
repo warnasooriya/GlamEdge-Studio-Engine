@@ -1,9 +1,17 @@
-import { useCallback, useState } from "react";
-import Cropper, { Area, MediaSize } from "react-easy-crop";
+import { useCallback, useState, type ComponentType } from "react";
+import CropperClass, { Area, CropperProps, MediaSize } from "react-easy-crop";
 import { RotateCcw, RotateCw } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+// react-easy-crop's class component predates @types/react's stricter
+// JSX.ElementClass checks and no longer satisfies them directly — recast as a
+// plain function-component type rather than pin an older @types/react.
+// `CropperProps` marks its defaulted props (minZoom, cropShape, ...) as
+// required, which the runtime component doesn't actually need — Partial<>
+// restores that leniency while still typing the props this file does pass.
+const Cropper = CropperClass as unknown as ComponentType<Partial<CropperProps>>;
 
 const ASPECT_PRESETS: { label: string; value: number | null }[] = [
   { label: "Original", value: null },

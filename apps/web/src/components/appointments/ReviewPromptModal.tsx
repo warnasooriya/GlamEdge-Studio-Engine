@@ -12,10 +12,33 @@ interface PendingReviewsResponse {
   appointments: ClientAppointment[];
 }
 
+// Persisted per-device so "Not Now" sticks across page reloads/navigation —
+// without this, the modal would re-show the same dismissed booking on every
+// visit to /account, since the pending-reviews list is otherwise unfiltered.
+const DISMISSED_KEY = "glamedge_dismissed_review_prompts";
+
+function loadDismissedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistDismissedIds(ids: Set<string>) {
+  try {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Storage can fail (private browsing, quota) — worst case the prompt
+    // just reappears next visit, which is a harmless fallback.
+  }
+}
+
 export function ReviewPromptModal() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => loadDismissedIds());
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
 
@@ -40,7 +63,12 @@ export function ReviewPromptModal() {
   });
 
   function dismiss() {
-    if (pending) setDismissedIds((prev) => new Set(prev).add(pending.id));
+    if (!pending) return;
+    setDismissedIds((prev) => {
+      const next = new Set(prev).add(pending.id);
+      persistDismissedIds(next);
+      return next;
+    });
   }
 
   if (!pending) return null;

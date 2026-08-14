@@ -100,21 +100,23 @@ export default function SettingsScreen() {
     <View style={styles.screen}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <Pressable style={styles.logoPicker} onPress={pickLogo}>
-            {tenant?.logoUrl ? (
-              <Image source={{ uri: tenant.logoUrl }} style={styles.logo} />
-            ) : (
-              <Ionicons name="storefront-outline" size={38} color="#fff" />
-            )}
-            {logoMutation.isPending ? (
-              <View style={styles.logoOverlay}>
-                <ActivityIndicator color="#fff" />
-              </View>
-            ) : null}
-            <View style={styles.editBadge}>
+          <View style={styles.logoWrapper}>
+            <Pressable style={styles.logoPicker} onPress={pickLogo}>
+              {tenant?.logoUrl ? (
+                <Image source={{ uri: tenant.logoUrl }} style={styles.logo} />
+              ) : (
+                <Ionicons name="storefront-outline" size={38} color="#fff" />
+              )}
+              {logoMutation.isPending ? (
+                <View style={styles.logoOverlay}>
+                  <ActivityIndicator color="#fff" />
+                </View>
+              ) : null}
+            </Pressable>
+            <Pressable style={styles.editBadge} onPress={pickLogo} hitSlop={8}>
               <Ionicons name="camera" size={14} color="#fff" />
-            </View>
-          </Pressable>
+            </Pressable>
+          </View>
           <Text style={styles.heroName}>{tenant?.salonName || "Your salon"}</Text>
           <Text style={styles.heroSubtitle}>{tenant?.ownerName ? `Owned by ${tenant.ownerName}` : "GlamEdge Owner"}</Text>
         </View>
@@ -185,6 +187,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 16, paddingBottom: 48 },
   hero: { alignItems: "center", paddingVertical: 8, marginBottom: 8 },
+  // Separate wrapper (no overflow:hidden) so the edit badge below can sit on
+  // top of the circular photo without being clipped by its circular mask.
+  logoWrapper: { width: 112, height: 112 },
   logoPicker: {
     width: 112,
     height: 112,
@@ -208,16 +213,21 @@ const styles = StyleSheet.create({
   },
   editBadge: {
     position: "absolute",
-    bottom: 2,
-    right: 2,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: colors.primaryDark,
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: colors.primaryDeep,
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
   heroName: { fontSize: 20, fontFamily: fonts.displayBold, color: colors.text, marginTop: 12, textAlign: "center" },
   heroSubtitle: { fontSize: 12, fontFamily: fonts.sans, color: colors.textMuted, marginTop: 2 },

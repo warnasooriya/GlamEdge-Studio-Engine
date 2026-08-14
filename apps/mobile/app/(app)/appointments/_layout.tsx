@@ -7,7 +7,7 @@ export default function AppointmentsLayout() {
     <Stack screenOptions={gradientHeaderScreenOptions}>
       <Stack.Screen
         name="index"
-        options={{ title: "Bookings", headerLeft: () => <DrawerToggleButton tintColor="#fffaf5" /> }}
+        options={{ title: "Bookings", headerLeft: () => <DrawerToggleButton tintColor="#fffaf5" pressOpacity={1} /> }}
       />
       <Stack.Screen name="[id]" options={{ title: "Appointment" }} />
     </Stack>
