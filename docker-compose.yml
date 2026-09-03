@@ -122,6 +122,8 @@ services:
       NOTIFYLK_USER_ID: ${NOTIFYLK_USER_ID:-}
       NOTIFYLK_API_KEY: ${NOTIFYLK_API_KEY:-}
       NOTIFYLK_SENDER_ID: ${NOTIFYLK_SENDER_ID:-}
+      DEMO_ACCOUNT_PHONE: ${DEMO_ACCOUNT_PHONE:-}
+      DEMO_ACCOUNT_OTP_CODE: ${DEMO_ACCOUNT_OTP_CODE:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_REGION: ${AWS_REGION:-}
@@ -137,6 +139,10 @@ services:
       WHATSAPP_WEB_INTERNAL_SECRET: ${WHATSAPP_WEB_INTERNAL_SECRET:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@glamedge.dev}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
+      PAYPAL_MODE: ${PAYPAL_MODE:-sandbox}
+      PAYPAL_FALLBACK_LKR_PER_USD: ${PAYPAL_FALLBACK_LKR_PER_USD:-300}
     volumes:
       # Only used when S3 is unconfigured; keeps uploaded media across rebuilds.
       - api_uploads:/app/apps/api/uploads
@@ -199,6 +205,7 @@ services:
         VITE_API_URL: ${VITE_API_URL:-/}
         VITE_SOCKET_URL: ${VITE_SOCKET_URL:-/}
         VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
+        VITE_PAYPAL_CLIENT_ID: ${VITE_PAYPAL_CLIENT_ID:-}
     restart: unless-stopped
     networks: [glamedge]
 
