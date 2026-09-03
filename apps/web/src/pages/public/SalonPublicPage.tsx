@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SiteFooter } from "@/components/shared/SiteFooter";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarHeart, Images, Star, Sparkles, MapPin, Phone } from "lucide-react";
@@ -198,6 +199,12 @@ export default function SalonPublicPage() {
           )}
           {tab === "reviews" && <ReviewsSection slug={slug} />}
         </div>
+      </div>
+
+      {/* pb clears the fixed mobile booking bar below, which would otherwise
+          sit on top of the last footer row. */}
+      <div className="pb-20 md:pb-0">
+        <SiteFooter />
       </div>
 
       {tab !== "booking" && (

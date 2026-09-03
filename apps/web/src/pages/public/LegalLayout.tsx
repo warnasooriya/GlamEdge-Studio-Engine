@@ -2,18 +2,19 @@ import { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { GlamEdgeLogo } from "@/components/shared/GlamEdgeLogo";
+import { SiteFooter } from "@/components/shared/SiteFooter";
+import { SITE } from "@/lib/siteInfo";
 
-// Details that appear verbatim on the published legal pages. Apple opens these
-// URLs during App Review, so keep them accurate — a policy that contradicts the
-// App Privacy answers in App Store Connect is a rejection.
+// Derived from SITE so the policy body, the support page and the footer can
+// never drift apart — Apple reads these pages during review and compares them
+// against the App Store listing.
 export const LEGAL = {
-  legalName: "GlamEdge",
-  email: "support@glamedge.beauty",
-  // Leave "" to hide the line entirely rather than print a placeholder.
-  address: "",
-  hostingRegion: "Singapore",
-  financialRetentionYears: 6,
-  lastUpdated: "3 September 2026",
+  legalName: SITE.legalName,
+  email: SITE.email,
+  address: SITE.addressLines.join(", "),
+  hostingRegion: SITE.hostingRegion,
+  financialRetentionYears: SITE.financialRetentionYears,
+  lastUpdated: SITE.legalLastUpdated,
 };
 
 export function LegalLayout({ title, intro, children }: { title: string; intro?: string; children: ReactNode }) {
@@ -39,13 +40,8 @@ export function LegalLayout({ title, intro, children }: { title: string; intro?:
         <div className="mt-10 space-y-9">{children}</div>
       </main>
 
-      <footer className="border-t border-neutral-200">
-        <div className="mx-auto flex max-w-3xl flex-wrap gap-x-6 gap-y-2 px-5 py-6 text-sm text-neutral-500">
-          <Link to="/privacy" className="transition hover:text-brand-700">Privacy Policy</Link>
-          <Link to="/support" className="transition hover:text-brand-700">Support</Link>
-          <a href={`mailto:${LEGAL.email}`} className="transition hover:text-brand-700">{LEGAL.email}</a>
-        </div>
-      </footer>
+      <SiteFooter />
+
     </div>
   );
 }

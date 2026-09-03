@@ -23,6 +23,7 @@ import { useToast } from "@/components/ui/toast";
 import { CategoryBadge } from "@/components/shared/CategoryBadge";
 import { GlamEdgeLogo } from "@/components/shared/GlamEdgeLogo";
 import { PortfolioLightbox } from "@/components/shared/PortfolioLightbox";
+import { SiteFooter } from "@/components/shared/SiteFooter";
 import { Service, Tenant } from "@/types";
 
 type SortMode = "rating" | "price_asc" | "price_desc" | "name";
@@ -399,6 +400,8 @@ export default function LandingPage() {
           onOpenChange={(next) => !next && setPortfolioModal(null)}
         />
       )}
+
+      <SiteFooter />
     </div>
   );
 }
