@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/config/prisma";
 import { HttpError } from "@/middlewares/errorHandler";
 import { otpProvider } from "@/services/otp";
-import { issueOtp, verifyOtp, consumeOtp } from "@/services/otp/otpStore";
+import { issueOtp, verifyOtp, consumeOtp, isDemoPhone } from "@/services/otp/otpStore";
 import { signClientToken } from "@/utils/clientJwt";
 import { ClientAuthRequest } from "@/middlewares/requireClientAuth";
 import { requestClientOtpSchema, verifyClientOtpSchema } from "./clientAuth.schema";
@@ -14,8 +14,14 @@ const updateClientSchema = z.object({
 
 export async function requestClientOtp(req: Request, res: Response) {
   const { phone } = requestClientOtpSchema.parse(req.body);
-  const code = await issueOtp(phone);
-  await otpProvider.send(phone, code);
+  // Same store-review bypass the salon-owner login uses: the demo number verifies
+  // against a fixed code, so there is no SMS to send. verifyOtp/consumeOtp in
+  // otpStore already short-circuit for it — this stops us burning SMS credit and
+  // overwriting that fixed code with a random one on the way in.
+  if (!isDemoPhone(phone)) {
+    const code = await issueOtp(phone);
+    await otpProvider.send(phone, code);
+  }
   return res.json({ success: true, message: "OTP sent" });
 }
 

@@ -18,13 +18,24 @@ function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-// The single phone number reserved for App Store / Play Store review. Reviewers
-// are outside our SMS provider's reach, so this number verifies against a fixed
-// code rather than a texted one. Requires BOTH env vars, so the bypass simply
-// doesn't exist in any environment that hasn't deliberately opted in.
+// Nothing in the app normalizes phone numbers — the login screens post exactly
+// what was typed — so compare on digits alone. Otherwise a reviewer entering
+// "+94 77 000 0000" or "94770000000" would silently miss the bypass and sit
+// waiting for an SMS that never arrives. Note this still won't match a local
+// format like "0770000000", whose digits genuinely differ.
+function digitsOnly(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+// The single phone number reserved for App Store / Play Store review, used by
+// both the salon-owner and the customer login. Reviewers are outside our SMS
+// provider's reach, so this number verifies against a fixed code rather than a
+// texted one. Requires BOTH env vars, so the bypass simply doesn't exist in any
+// environment that hasn't deliberately opted in.
 export function isDemoPhone(phone: string): boolean {
   const { phone: demoPhone, code: demoCode } = env.demoAccount;
-  return Boolean(demoPhone && demoCode && phone === demoPhone);
+  if (!demoPhone || !demoCode) return false;
+  return digitsOnly(phone) === digitsOnly(demoPhone);
 }
 
 export async function issueOtp(phone: string): Promise<string> {
