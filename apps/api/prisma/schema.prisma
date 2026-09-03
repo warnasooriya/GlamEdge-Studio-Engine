@@ -31,6 +31,10 @@ enum TenantStatus {
   APPROVED
   REJECTED
   SUSPENDED
+  // Owner-initiated account deletion (App Store Guideline 5.1.1(v)). Identifying
+  // fields are scrubbed and access is revoked, but ledger and subscription rows
+  // survive for accounting — see deleteAccount() in auth.controller.ts.
+  DELETED
 }
 
 enum LedgerType {
@@ -80,39 +84,40 @@ enum RescheduleStatus {
 }
 
 model Tenant {
-  id                    String             @id @default(uuid())
-  salonName             String             @db.VarChar(191)
-  slug                  String             @unique @db.VarChar(191)
-  phone                 String             @unique @db.VarChar(50)
-  ownerName             String             @db.VarChar(191)
-  subscription          SubscriptionTier   @default(STARTER)
-  isActive              Boolean            @default(true)
-  status                TenantStatus       @default(PENDING)
-  rejectionReason       String?            @db.VarChar(500)
+  id                    String            @id @default(uuid())
+  salonName             String            @db.VarChar(191)
+  slug                  String            @unique @db.VarChar(191)
+  phone                 String            @unique @db.VarChar(50)
+  ownerName             String            @db.VarChar(191)
+  subscription          SubscriptionTier  @default(STARTER)
+  isActive              Boolean           @default(true)
+  status                TenantStatus      @default(PENDING)
+  rejectionReason       String?           @db.VarChar(500)
   approvedAt            DateTime?
-  subscriptionCycle     SubscriptionCycle  @default(MONTHLY)
-  subscriptionFee       Decimal            @default(0.00) @db.Decimal(10, 2)
+  subscriptionCycle     SubscriptionCycle @default(MONTHLY)
+  subscriptionFee       Decimal           @default(0.00) @db.Decimal(10, 2)
   subscriptionStartedAt DateTime?
   subscriptionExpiresAt DateTime?
   expiryNotifiedAt      DateTime?
-  logoUrl               String?            @db.VarChar(500)
-  address               String?            @db.Text
-  mapLink               String?            @db.VarChar(500)
+  deletedAt             DateTime?
+  logoUrl               String?           @db.VarChar(500)
+  address               String?           @db.Text
+  mapLink               String?           @db.VarChar(500)
   latitude              Float?
   longitude             Float?
-  contactPhone          String?            @db.VarChar(50)
+  contactPhone          String?           @db.VarChar(50)
   // Where PayPal sends customer payments — the platform's own PayPal REST
   // app creates each order with this as payee.email_address, so funds route
   // straight to the salon with no PayPal Partner/OAuth approval needed.
-  paypalEmail           String?            @db.VarChar(191)
+  paypalEmail           String?           @db.VarChar(191)
   // Both null = not configured yet, and every existing behavior (9am-8pm,
   // every day) stays exactly as it was before this feature — see
   // apps/api/src/utils/businessHours.ts for the fallback.
-  openTime              String?            @db.VarChar(5) // "09:00"
-  closeTime             String?            @db.VarChar(5) // "20:00"
+  openTime              String?           @db.VarChar(5) // "09:00"
+  closeTime             String?           @db.VarChar(5) // "20:00"
   workingDays           Json? // int[] using JS Date.getDay() (0=Sunday..6=Saturday)
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   services             Service[]
   staff                Staff[]

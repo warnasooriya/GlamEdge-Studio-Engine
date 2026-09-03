@@ -36,6 +36,15 @@ export const env = {
   jwtExpiresIn: optional("JWT_EXPIRES_IN", "7d"),
 
   otpProvider: optional("OTP_PROVIDER"),
+
+  // App/Play Store review demo account. Store reviewers sit outside Sri Lanka and
+  // can't receive our OTP SMS, so this one phone verifies against a fixed code
+  // instead of a texted one. Both vars must be set for the bypass to exist at all
+  // — with either left blank (the default) every number goes through real SMS.
+  demoAccount: {
+    phone: optional("DEMO_ACCOUNT_PHONE"),
+    code: optional("DEMO_ACCOUNT_OTP_CODE"),
+  },
   notifyLk: {
     userId: optional("NOTIFYLK_USER_ID"),
     apiKey: optional("NOTIFYLK_API_KEY"),

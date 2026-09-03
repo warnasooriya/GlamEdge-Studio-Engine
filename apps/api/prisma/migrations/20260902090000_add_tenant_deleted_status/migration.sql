@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `tenants` ADD COLUMN `deletedAt` DATETIME(3) NULL;
+
+-- AlterEnum
+ALTER TABLE `tenants` MODIFY `status` ENUM('PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED', 'DELETED') NOT NULL DEFAULT 'PENDING';
