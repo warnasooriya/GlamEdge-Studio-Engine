@@ -23,3 +23,8 @@ export async function getMe() {
   const { data } = await api.get<{ success: boolean; tenant: Tenant }>("/api/auth/me");
   return data.tenant;
 }
+
+export async function deleteAccount() {
+  const { data } = await api.delete<{ success: boolean; message: string }>("/api/auth/account");
+  return data;
+}

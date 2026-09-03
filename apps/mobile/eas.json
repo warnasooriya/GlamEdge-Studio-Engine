@@ -9,6 +9,11 @@
       "distribution": "internal",
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://glamedge.beauty",
+        "EXPO_PUBLIC_SOCKET_URL": "https://glamedge.beauty",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyBjmDhbFdX8o0NsoIbqHbiuzvcgdWxIN0w"
       }
     },
     "preview": {
@@ -16,20 +21,25 @@
       "channel": "preview",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://glamedge.beauty",
+        "EXPO_PUBLIC_SOCKET_URL": "https://glamedge.beauty",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyBjmDhbFdX8o0NsoIbqHbiuzvcgdWxIN0w"
       }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://glamedge.beauty",
+        "EXPO_PUBLIC_SOCKET_URL": "https://glamedge.beauty",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyBjmDhbFdX8o0NsoIbqHbiuzvcgdWxIN0w"
+      }
     }
   },
   "submit": {
     "production": {
-      "ios": {
-        "appleId": "your-apple-id@example.com",
-        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
-      },
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",
         "track": "internal"

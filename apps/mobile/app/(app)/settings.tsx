@@ -6,6 +6,7 @@ import * as Sharing from "expo-sharing";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import { updateTenant, uploadTenantLogo } from "@/api/tenant";
+import { deleteAccount } from "@/api/auth";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
 import { updateTenant as updateTenantAction } from "@/store/authSlice";
 import { useLogout } from "@/hooks/useLogout";
@@ -22,6 +23,37 @@ export default function SettingsScreen() {
   const tenant = useAppSelector((s) => s.auth.tenant);
   const token = useAppSelector((s) => s.auth.token);
   const handleLogout = useLogout();
+
+  // App Store Guideline 5.1.1(v) requires in-app account deletion. Two taps deep
+  // and spelled out, because it is irreversible from the owner's side.
+  const deleteMutation = useMutation({
+    mutationFn: deleteAccount,
+    onSuccess: () => {
+      Alert.alert("Account deleted", "Your salon account has been deleted.");
+      handleLogout();
+    },
+    onError: (err: any) =>
+      Alert.alert("Couldn't delete account", err?.response?.data?.error ?? "Something went wrong. Please try again."),
+  });
+
+  function confirmDelete() {
+    Alert.alert(
+      "Delete account?",
+      "This permanently closes your GlamEdge salon account. Your bookings, services, staff, and customer history will no longer be accessible, and you'll be signed out on every device. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () =>
+            Alert.alert("Are you sure?", "Tap Delete again to permanently close your account.", [
+              { text: "Cancel", style: "cancel" },
+              { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate() },
+            ]),
+        },
+      ]
+    );
+  }
 
   const [salonName, setSalonName] = useState(tenant?.salonName ?? "");
   const [ownerName, setOwnerName] = useState(tenant?.ownerName ?? "");
@@ -176,6 +208,20 @@ export default function SettingsScreen() {
 
         <Button title="Save changes" onPress={() => saveMutation.mutate()} loading={saveMutation.isPending} style={styles.saveBtn} />
         <Button title="Log out" variant="danger" onPress={handleLogout} style={styles.logoutBtn} />
+
+        <View style={styles.dangerZone}>
+          <Text style={styles.dangerTitle}>Delete account</Text>
+          <Text style={styles.dangerBody}>
+            Permanently close this salon account and sign out everywhere. This can't be undone.
+          </Text>
+          <Pressable onPress={confirmDelete} disabled={deleteMutation.isPending} style={styles.deleteBtn}>
+            {deleteMutation.isPending ? (
+              <ActivityIndicator color={colors.danger} />
+            ) : (
+              <Text style={styles.deleteBtnText}>Delete my account</Text>
+            )}
+          </Pressable>
+        </View>
       </ScrollView>
       <BottomTabBar />
     </View>
@@ -268,4 +314,9 @@ const styles = StyleSheet.create({
   dayChipTextActive: { color: "#fff" },
   saveBtn: { marginTop: 24 },
   logoutBtn: { marginTop: 12 },
+  dangerZone: { marginTop: 28, paddingTop: 18, borderTopWidth: 1, borderTopColor: colors.border },
+  dangerTitle: { fontSize: 13, fontFamily: fonts.sansSemiBold, color: colors.text, marginBottom: 4 },
+  dangerBody: { fontSize: 12, color: colors.textMuted, lineHeight: 17, marginBottom: 12 },
+  deleteBtn: { alignSelf: "flex-start", paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: colors.danger },
+  deleteBtnText: { fontSize: 13, fontFamily: fonts.sansSemiBold, color: colors.danger },
 });
