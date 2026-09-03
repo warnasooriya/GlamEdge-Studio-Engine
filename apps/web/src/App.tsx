@@ -17,6 +17,8 @@ import POSPage from "@/pages/pos/POSPage";
 import SalonPublicPage from "@/pages/public/SalonPublicPage";
 import PublicPaymentPage from "@/pages/public/PublicPaymentPage";
 import LandingPage from "@/pages/public/LandingPage";
+import PrivacyPolicyPage from "@/pages/public/PrivacyPolicyPage";
+import SupportPage from "@/pages/public/SupportPage";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 import { AdminProtectedRoute } from "@/components/shared/AdminProtectedRoute";
 import ClientLayout from "@/pages/client/ClientLayout";
@@ -43,6 +45,11 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={<OnboardingPage />} />
       <Route path="/salon/:slug" element={<SalonPublicPage />} />
+      {/* App Store Connect points its Privacy Policy and Support URLs here, and
+          App Review opens both. They must resolve to real pages — the catch-all
+          below would otherwise bounce a reviewer to the landing page. */}
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/support" element={<SupportPage />} />
       <Route path="/pay/:paymentId" element={<PublicPaymentPage />} />
 
       <Route path="/account" element={<ClientLayout />}>
