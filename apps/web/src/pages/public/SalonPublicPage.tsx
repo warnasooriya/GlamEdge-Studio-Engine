@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SiteFooter } from "@/components/shared/SiteFooter";
+import { BackToSite } from "@/components/shared/BackToSite";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarHeart, Images, Star, Sparkles, MapPin, Phone } from "lucide-react";
@@ -64,10 +65,16 @@ export default function SalonPublicPage() {
         Loading salon...
       </div>
     );
+  // A stale QR code or an old shared link lands here, so this needs a way out
+  // rather than a bare message on an otherwise empty screen.
   if (error || !data)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-hero text-rose-200">
-        Salon not found.
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gradient-hero px-4 text-center">
+        <p className="text-rose-200">Salon not found.</p>
+        <p className="max-w-sm text-sm text-cream-100/60">
+          This salon may have closed or the link may be out of date.
+        </p>
+        <BackToSite label="Browse all salons" />
       </div>
     );
 
@@ -91,6 +98,10 @@ export default function SalonPublicPage() {
             className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-sm"
           />
         )}
+        <div className="absolute left-4 top-4 z-20">
+          <BackToSite />
+        </div>
+
         <div className="pointer-events-none absolute -left-10 top-0 h-40 w-40 animate-float-slow rounded-full bg-brand-500/25 blur-3xl" />
         <div className="pointer-events-none absolute -right-6 bottom-0 h-32 w-32 animate-float-slow rounded-full bg-amber-400/20 blur-3xl [animation-delay:2s]" />
 

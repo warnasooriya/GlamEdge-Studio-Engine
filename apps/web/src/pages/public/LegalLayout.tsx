@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
 import { GlamEdgeLogo } from "@/components/shared/GlamEdgeLogo";
 import { SiteFooter } from "@/components/shared/SiteFooter";
+import { BackToSite } from "@/components/shared/BackToSite";
 import { SITE } from "@/lib/siteInfo";
 
 // Derived from SITE so the policy body, the support page and the footer can
@@ -26,10 +26,7 @@ export function LegalLayout({ title, intro, children }: { title: string; intro?:
             <GlamEdgeLogo className="h-5 w-5" />
             <span className="text-sm font-semibold tracking-tight">GlamEdge</span>
           </Link>
-          <Link to="/" className="flex items-center gap-1.5 text-sm text-neutral-500 transition hover:text-brand-700">
-            <ArrowLeft className="h-4 w-4" />
-            Back to site
-          </Link>
+          <BackToSite tone="onLight" label="Back to site" />
         </div>
       </header>
 

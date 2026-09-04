@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BackToSite } from "@/components/shared/BackToSite";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
@@ -22,7 +23,10 @@ const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID || "";
 
 function CenteredMessage({ children, tone }: { children: React.ReactNode; tone?: "error" }) {
   return (
-    <div className={`flex min-h-screen items-center justify-center bg-gradient-hero px-4 text-center ${tone === "error" ? "text-rose-200" : "text-cream-50"}`}>
+    <div className={`relative flex min-h-screen items-center justify-center bg-gradient-hero px-4 text-center ${tone === "error" ? "text-rose-200" : "text-cream-50"}`}>
+      <div className="absolute left-4 top-4">
+        <BackToSite label="GlamEdge" />
+      </div>
       {children}
     </div>
   );
@@ -45,7 +49,10 @@ export default function PublicPaymentPage() {
   const isCancelled = data.status === "CANCELLED" && !justCaptured;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-hero px-4 py-10">
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-hero px-4 py-10">
+      <div className="absolute left-4 top-4">
+        <BackToSite label="GlamEdge" />
+      </div>
       <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl dark:bg-plum-800">
         <div className="flex flex-col items-center gap-2 text-center">
           {data.logoUrl ? (
