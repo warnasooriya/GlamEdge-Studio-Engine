@@ -4,9 +4,10 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { updateTenant, uploadTenantLogo } from "@/api/tenant";
 import { deleteAccount } from "@/api/auth";
+import { listBlockedClients, unblockClient } from "@/api/moderation";
 import { useAppDispatch, useAppSelector } from "@/hooks/redux";
 import { updateTenant as updateTenantAction } from "@/store/authSlice";
 import { useLogout } from "@/hooks/useLogout";
@@ -23,6 +24,19 @@ export default function SettingsScreen() {
   const tenant = useAppSelector((s) => s.auth.tenant);
   const token = useAppSelector((s) => s.auth.token);
   const handleLogout = useLogout();
+  const queryClient = useQueryClient();
+
+  // Somewhere to undo a block made from a booking's chat thread — the confirm
+  // dialog there tells the owner it can be reversed here.
+  const { data: blockedClients } = useQuery({
+    queryKey: ["blocked-clients"],
+    queryFn: listBlockedClients,
+  });
+
+  const unblockMutation = useMutation({
+    mutationFn: unblockClient,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["blocked-clients"] }),
+  });
 
   // App Store Guideline 5.1.1(v) requires in-app account deletion. Two taps deep
   // and spelled out, because it is irreversible from the owner's side.
@@ -207,6 +221,30 @@ export default function SettingsScreen() {
         </View>
 
         <Button title="Save changes" onPress={() => saveMutation.mutate()} loading={saveMutation.isPending} style={styles.saveBtn} />
+        {blockedClients && blockedClients.length > 0 ? (
+          <View style={styles.blockedSection}>
+            <Text style={styles.blockedTitle}>Blocked clients</Text>
+            <Text style={styles.blockedBody}>
+              These clients can't message you or book online. Unblock to let them back in.
+            </Text>
+            {blockedClients.map((b) => (
+              <View key={b.id} style={styles.blockedRow}>
+                <View style={styles.blockedWho}>
+                  <Text style={styles.blockedName}>{b.client.name}</Text>
+                  <Text style={styles.blockedPhone}>{b.client.phone}</Text>
+                </View>
+                <Pressable
+                  onPress={() => unblockMutation.mutate(b.clientId)}
+                  disabled={unblockMutation.isPending}
+                  style={styles.unblockBtn}
+                >
+                  <Text style={styles.unblockText}>Unblock</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         <Button title="Log out" variant="danger" onPress={handleLogout} style={styles.logoutBtn} />
 
         <View style={styles.dangerZone}>
@@ -314,6 +352,15 @@ const styles = StyleSheet.create({
   dayChipTextActive: { color: "#fff" },
   saveBtn: { marginTop: 24 },
   logoutBtn: { marginTop: 12 },
+  blockedSection: { marginTop: 26, paddingTop: 18, borderTopWidth: 1, borderTopColor: colors.border },
+  blockedTitle: { fontSize: 13, fontFamily: fonts.sansSemiBold, color: colors.text, marginBottom: 4 },
+  blockedBody: { fontSize: 12, color: colors.textMuted, lineHeight: 17, marginBottom: 10 },
+  blockedRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  blockedWho: { flex: 1 },
+  blockedName: { fontSize: 13, fontFamily: fonts.sansSemiBold, color: colors.text },
+  blockedPhone: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
+  unblockBtn: { paddingVertical: 7, paddingHorizontal: 14, borderRadius: 9, borderWidth: 1, borderColor: colors.primary },
+  unblockText: { fontSize: 12, fontFamily: fonts.sansSemiBold, color: colors.primary },
   dangerZone: { marginTop: 28, paddingTop: 18, borderTopWidth: 1, borderTopColor: colors.border },
   dangerTitle: { fontSize: 13, fontFamily: fonts.sansSemiBold, color: colors.text, marginBottom: 4 },
   dangerBody: { fontSize: 12, color: colors.textMuted, lineHeight: 17, marginBottom: 12 },

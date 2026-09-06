@@ -78,6 +78,18 @@ enum NotificationType {
   SUBSCRIPTION_EXPIRED
 }
 
+enum ReportTargetType {
+  REVIEW
+  MESSAGE
+  FEED_POST
+}
+
+enum ReportStatus {
+  OPEN
+  ACTIONED
+  DISMISSED
+}
+
 enum RescheduleStatus {
   NONE
   PROPOSED
@@ -129,6 +141,8 @@ model Tenant {
   subscriptionPayments SubscriptionPayment[]
   paypalPayments       PaypalPayment[]
   ownerPushTokens      OwnerPushToken[]
+  contentReports       ContentReport[]
+  blockedClients       BlockedClient[]
 
   @@map("tenants")
 }
@@ -210,6 +224,7 @@ model Client {
 
   appointments  Appointment[]
   notifications Notification[]
+  blockedBy     BlockedClient[]
 
   @@map("clients")
 }
@@ -373,4 +388,41 @@ model SubscriptionPayment {
   @@index([tenantId])
   @@index([paidAt])
   @@map("subscription_payments")
+}
+
+// App Store Guideline 1.2 requires apps carrying user-generated content to offer
+// a way to report it and to block abusive users. Reviews live in MySQL while
+// messages and feed posts live in MongoDB, so the target is an opaque id plus a
+// discriminator rather than a foreign key.
+model ContentReport {
+  id         String           @id @default(uuid())
+  tenantId   String
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  targetType ReportTargetType
+  targetId   String           @db.VarChar(191)
+  reason     String           @db.VarChar(80)
+  details    String?          @db.Text
+  status     ReportStatus     @default(OPEN)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("content_reports")
+}
+
+// Scoped to one salon rather than global: a client blocked by one salon can
+// still book with every other salon on the platform.
+model BlockedClient {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  reason    String?  @db.VarChar(200)
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, clientId])
+  @@index([tenantId])
+  @@map("blocked_clients")
 }

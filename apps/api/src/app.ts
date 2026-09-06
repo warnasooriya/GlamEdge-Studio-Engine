@@ -23,6 +23,7 @@ import { pushTokenRouter } from "@/modules/pushTokens/pushToken.routes";
 import { analyticsRouter } from "@/modules/analytics/analytics.routes";
 import { reportsRouter } from "@/modules/reports/reports.routes";
 import { adminRouter } from "@/modules/admin/admin.routes";
+import { moderationRouter } from "@/modules/moderation/moderation.routes";
 import { renderSalonPage, renderSitemap } from "@/modules/seo/seo.controller";
 
 export const app = express();
@@ -45,6 +46,7 @@ app.use("/api/tenants", tenantRouter);
 app.use("/api/services", serviceRouter);
 app.use("/api/staff", staffRouter);
 app.use("/api/appointments", appointmentRouter);
+app.use("/api/moderation", moderationRouter);
 app.use("/api/ledger", ledgerRouter);
 app.use("/api/billing", billingRouter);
 app.use("/api/payments", paymentRouter);

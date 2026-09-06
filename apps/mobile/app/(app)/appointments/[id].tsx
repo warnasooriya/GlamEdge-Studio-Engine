@@ -109,7 +109,11 @@ export default function AppointmentDetailScreen() {
       ) : null}
 
       <Section title="Message client">
-        <ChatThread appointmentId={id} />
+        <ChatThread
+          appointmentId={id}
+          clientId={appointment.clientId}
+          clientName={appointment.clientName}
+        />
       </Section>
 
       {appointment.status === "PENDING" || appointment.status === "CONFIRMED" ? (

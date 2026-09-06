@@ -1,20 +1,24 @@
 import { useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { listReviews } from "@/api/reviews";
 import { Pagination } from "@/components/Pagination";
+import { ReportModal } from "@/components/ReportModal";
 import { colors, fonts } from "@/lib/theme";
 import { formatDate } from "@/lib/format";
 
 export default function ReviewsScreen() {
   const [page, setPage] = useState(1);
+  // Reviews are written by clients, so they need a report route (Guideline 1.2).
+  const [reporting, setReporting] = useState<{ id: string; clientName: string } | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ["reviews", page],
     queryFn: () => listReviews(page),
   });
 
   return (
+    <>
     <FlatList
       style={styles.container}
       contentContainerStyle={styles.content}
@@ -50,6 +54,14 @@ export default function ReviewsScreen() {
             ))}
           </View>
           {item.comment ? <Text style={styles.comment}>{item.comment}</Text> : null}
+          <Pressable
+            onPress={() => setReporting({ id: item.id, clientName: item.clientName })}
+            hitSlop={8}
+            style={styles.reportBtn}
+          >
+            <Ionicons name="flag-outline" size={13} color={colors.textMuted} />
+            <Text style={styles.reportText}>Report</Text>
+          </Pressable>
         </View>
       )}
       ListFooterComponent={
@@ -63,6 +75,14 @@ export default function ReviewsScreen() {
         ) : null
       }
     />
+    <ReportModal
+      visible={!!reporting}
+      onClose={() => setReporting(null)}
+      targetType="REVIEW"
+      targetId={reporting?.id ?? ""}
+      title={reporting ? `Report review by ${reporting.clientName}` : "Report review"}
+    />
+    </>
   );
 }
 
@@ -96,6 +116,8 @@ const styles = StyleSheet.create({
   clientName: { fontSize: 14, fontFamily: fonts.sansBold, color: colors.text },
   date: { fontSize: 11, fontFamily: fonts.sans, color: colors.textMuted },
   comment: { fontSize: 13, fontFamily: fonts.sans, color: colors.text, marginTop: 8 },
+  reportBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", marginTop: 10 },
+  reportText: { fontSize: 11, fontFamily: fonts.sansSemiBold, color: colors.textMuted },
   empty: { paddingVertical: 40, alignItems: "center" },
   emptyText: { color: colors.textMuted, fontSize: 14, fontFamily: fonts.sans },
 });

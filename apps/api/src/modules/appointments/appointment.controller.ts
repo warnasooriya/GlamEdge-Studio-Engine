@@ -102,6 +102,16 @@ export async function createPublicAppointment(req: ClientAuthRequest, res: Respo
   const data = createAppointmentSchema.parse(req.body);
   const { clientId, phone: clientPhone } = req.clientAuth!;
 
+  // A salon that has blocked this client shouldn't receive new bookings from
+  // them. Worded without confirming the block, so it can't be used to probe.
+  const blocked = await prisma.blockedClient.findUnique({
+    where: { tenantId_clientId: { tenantId: tenant.id, clientId } },
+    select: { id: true },
+  });
+  if (blocked) {
+    throw new HttpError(403, "This salon isn't accepting online bookings from your account. Please contact the salon directly.");
+  }
+
   if (!isWithinBusinessHours(tenant, new Date(data.bookingTime))) {
     throw new HttpError(400, "That time is outside the salon's working hours. Please pick another slot.");
   }

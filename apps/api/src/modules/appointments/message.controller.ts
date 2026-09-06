@@ -43,6 +43,18 @@ export async function listMessages(req: AppointmentPartyRequest, res: Response) 
 
 export async function sendMessage(req: AppointmentPartyRequest, res: Response) {
   const appointment = await loadAppointmentForParty(req);
+
+  // Blocking is one-directional: the salon stops hearing from a client it has
+  // blocked, while the salon can still reply if it chooses to.
+  if (req.party!.type === "CLIENT" && appointment.clientId) {
+    const blocked = await prisma.blockedClient.findUnique({
+      where: { tenantId_clientId: { tenantId: appointment.tenantId, clientId: appointment.clientId } },
+      select: { id: true },
+    });
+    if (blocked) {
+      throw new HttpError(403, "You can no longer send messages to this salon.");
+    }
+  }
   const { text } = sendMessageSchema.parse(req.body);
   const file = req.file as Express.Multer.File | undefined;
 
