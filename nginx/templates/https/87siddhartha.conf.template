@@ -1,0 +1,48 @@
+# 87siddhartha.glamedge.beauty -> 87 Siddhartha Society ledger (the siddhartha87 compose project).
+#
+# Lives in the GlamEdge nginx container (nginx/templates/https/ in the GlamEdge repo), next to
+# app.conf.template and vehicle.conf.template. The source of truth is deploy/nginx/ in the
+# 87-siddhartha-society repo. The certificate is issued by GlamEdge's certbot container and renewed
+# with the others.
+#
+# The upstream is resolved per request through Docker's DNS (127.0.0.11) instead of an `upstream`
+# block, so nginx — and every other site — still starts and runs when this app is stopped or being
+# redeployed (this host just answers 502 meanwhile).
+
+server {
+    listen 80;
+    server_name 87siddhartha.glamedge.beauty;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name 87siddhartha.glamedge.beauty;
+
+    ssl_certificate     /etc/letsencrypt/live/87siddhartha.glamedge.beauty/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/87siddhartha.glamedge.beauty/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size 2m;
+
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    set $siddhartha87_app http://siddhartha87-app:4000;
+
+    location / {
+        proxy_pass $siddhartha87_app;
+        include /etc/nginx/includes/proxy.conf;
+    }
+}
