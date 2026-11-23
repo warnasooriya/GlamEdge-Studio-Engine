@@ -1,0 +1,48 @@
+# vehicle.glamedge.beauty -> Dealership Manager (the vehicle-app compose project).
+#
+# Lives in the GlamEdge nginx container (nginx/templates/https/ in the GlamEdge repo), next to
+# app.conf.template. The certificate is issued by GlamEdge's certbot container and renewed with
+# the others.
+#
+# The upstream is resolved per request through Docker's DNS (127.0.0.11) instead of an
+# `upstream` block, so nginx — and glamedge.beauty — still start and run normally even when
+# the vehicle app container is stopped or being redeployed (that host just answers 502).
+
+server {
+    listen 80;
+    server_name vehicle.glamedge.beauty;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name vehicle.glamedge.beauty;
+
+    ssl_certificate     /etc/letsencrypt/live/vehicle.glamedge.beauty/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/vehicle.glamedge.beauty/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # The app sends its own security headers (CSP, HSTS, frame and referrer policy).
+
+    # Vehicle documents can be up to 20 MB.
+    client_max_body_size 25m;
+
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    set $vehicle_app http://vehicle-app:3000;
+
+    location / {
+        proxy_pass $vehicle_app;
+        include /etc/nginx/includes/proxy.conf;
+        # Exports and CR scans can take a little while.
+        proxy_read_timeout 120s;
+    }
+}
